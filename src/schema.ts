@@ -151,10 +151,16 @@ export function splitPath(path: string): { parent: string; name: string } {
  * mudar muita coisa de uma vez). O app ainda pede confirmação normal para todos.
  */
 export function riskWarning(path: string): string | null {
-  if (/\/(\$?vph)$/.test(path)) return "Phantom 48V: confirme o microfone ligado (pode danificar microfones de fita).";
-  if (/^\/io\//.test(path) || /\/conn\//.test(path)) return "Patch/roteamento: pode cortar um sinal ao vivo.";
-  if (/^\/\$ctl\//.test(path) || /^\/cfg\//.test(path) || /^\/\$syscfg\//.test(path)) {
-    return "Configuração/controle da mesa: pode afetar a mesa inteira.";
+  const leaf = path.slice(path.lastIndexOf("/") + 1);
+  // Identificação visual nunca é risco.
+  if (["name", "col", "icon", "led", "tags"].includes(leaf)) return null;
+  if (/^\$?vph$/.test(leaf)) return "Phantom 48V: confirme o microfone ligado (pode danificar microfones de fita).";
+  if (/\/conn\/(grp|in|altgrp|altin)$/.test(path) || /^\/io\/out\//.test(path) || leaf === "rmt") {
+    return "Patch/roteamento: pode cortar um sinal ao vivo.";
   }
+  if (/^\/io\/in\//.test(path)) {
+    return "Entrada física: muda todos os canais que usam essa entrada.";
+  }
+  if (/^\/(\$ctl|cfg|\$syscfg)(\/|$)/.test(path)) return "Configuração/controle da mesa: pode afetar a mesa inteira.";
   return null;
 }

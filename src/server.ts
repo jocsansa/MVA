@@ -159,7 +159,11 @@ const server = http.createServer(async (req, res) => {
       const base = path === "/" ? "" : path;
       sendJson(res, 200, {
         path,
-        children: children.map((c) => ({ ...c, path: `${base}/${c.name}`, risk: riskWarning(`${base}/${c.name}`) })),
+        children: children.map((c) => {
+          const p = `${base}/${c.name}`;
+          // Somente leitura não tem risco: a mesa não deixa escrever.
+          return { ...c, path: p, risk: c.kind === "param" && !c.readOnly ? riskWarning(p) : null };
+        }),
       });
     } catch (e) {
       sendJson(res, 502, { error: (e as Error).message });

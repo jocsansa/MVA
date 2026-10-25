@@ -104,7 +104,13 @@ test("caminhos aceitos e avisos de risco", () => {
   assert.match(riskWarning("/io/in/A/1/vph")!, /Phantom/);
   assert.match(riskWarning("/ch/1/in/set/$vph")!, /Phantom/);
   assert.match(riskWarning("/ch/1/in/conn/grp")!, /Patch/);
+  assert.match(riskWarning("/io/in/A/1/rmt")!, /Patch/);
+  assert.match(riskWarning("/io/in/A/1/g")!, /todos os canais/);
+  assert.match(riskWarning("/io/out/LCL/1/grp")!, /Patch/);
+  assert.match(riskWarning("/$ctl/scn/load")!, /mesa inteira/);
   assert.equal(riskWarning("/ch/1/pan"), null);
+  assert.equal(riskWarning("/io/in/A/1/name"), null);
+  assert.equal(riskWarning("/io/in/A/1/col"), null);
 });
 
 test("setParam: consulta a descrição, escreve uma vez e lê de volta", async () => {
