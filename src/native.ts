@@ -85,13 +85,36 @@ export function meterPortRequest(udpPort: number): Buffer {
 
 /** Define a coleção (canais 1..n) sob um report id. Índices 0x00..0x7f = 1..128. */
 export function meterChannelsRequest(reportId: number, channels: number[]): Buffer {
-  const b: number[] = [TOK_REPORT_ID, ...u32(reportId), TOK_COLLECTION_START, TOK_CHANNEL];
-  for (const ch of channels) {
-    if (ch < 1 || ch > 40) throw new Error(`canal fora da faixa: ${ch}`);
-    b.push(ch - 1);
+  for (const ch of channels) if (ch < 1 || ch > 40) throw new Error(`canal fora da faixa: ${ch}`);
+  return meterRequest(reportId, TOK_CHANNEL, channels);
+}
+
+/**
+ * Coleção de um tipo de medidor (token 0xa0 canal, 0xa1 aux, 0xa2 bus, 0xa3 main,
+ * 0xa4 matrix, 0xa5 dca) para os índices 1-based dados, sob um report id.
+ */
+export function meterRequest(reportId: number, token: number, indices: number[]): Buffer {
+  const b: number[] = [TOK_REPORT_ID, ...u32(reportId), TOK_COLLECTION_START, token];
+  for (const i of indices) {
+    if (!Number.isInteger(i) || i < 1 || i > 128) throw new Error(`índice de medidor fora da faixa: ${i}`);
+    b.push(i - 1);
   }
   b.push(TOK_COLLECTION_END);
   return Buffer.from(b);
+}
+
+/** Pacote de medidores genérico: report id + grupos de `words` valores (dB) por strip. */
+export function parseMeterWords(packet: Buffer, words: number): { reportId: number; strips: number[][] } | null {
+  if (packet.length < 4 || words < 1) return null;
+  const reportId = packet.readUInt32BE(0);
+  const n = Math.floor((packet.length - 4) / 2 / words);
+  const strips: number[][] = [];
+  for (let s = 0; s < n; s++) {
+    const vals: number[] = [];
+    for (let w = 0; w < words; w++) vals.push(packet.readInt16BE(4 + (s * words + w) * 2) / 256);
+    strips.push(vals);
+  }
+  return { reportId, strips };
 }
 
 /** Repetir o report id renova o envio por mais 5 segundos. */

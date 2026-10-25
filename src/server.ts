@@ -13,6 +13,7 @@ import {
   validateGain,
 } from "./wing.ts";
 import { isSafePath, riskWarning } from "./schema.ts";
+import { STRIP_KINDS } from "./strips.ts";
 
 const host = process.env.CONSOLE_HOST;
 if (!host) {
@@ -32,7 +33,7 @@ function broadcast(event: string, data: unknown): void {
   for (const res of clients) res.write(payload);
 }
 
-wing.on("channel", (st) => broadcast("channel", st));
+wing.on("strip", (st) => broadcast("strip", st));
 wing.on("status", (s) => broadcast("status", s));
 wing.on("info", (info) => console.log(`Mesa respondeu: ${info}`));
 wing.on("reply", (text) => console.log(`Mesa (/*): ${text}`));
@@ -63,9 +64,16 @@ function sendJson(res: http.ServerResponse, code: number, data: unknown): void {
  */
 function paramTolerance(min = 0, max = 0, steps = 0, type = "lin"): number {
   if (type === "int") return 0;
+  // Fader: 1024 passos não lineares em dB (mais finos perto de 0 dB).
+  if (type === "fader") return 0.5;
   if (!steps || steps < 2) return 0.01;
   if (type === "log" && min > 0) return max * (Math.pow(max / min, 1 / (steps - 1)) - 1);
   return (max - min) / (steps - 1) / 2 + 1e-6;
+}
+
+/** Estado completo para a página (channels mantido para compatibilidade). */
+function snapshot() {
+  return { status: wing.status, strips: wing.strips, kinds: STRIP_KINDS, channels: wing.channels };
 }
 
 const WRITE_ROUTE = /^\/api\/channels\/(\d+)\/(name|mute|fader|gain)$/;
@@ -129,7 +137,10 @@ wing.on("meters", () => {
   meterPending = true;
   setTimeout(() => {
     meterPending = false;
-    broadcast("meters", wing.channels.map((c) => c.meter));
+    // { ch: [{l, r} | null, ...], aux: [...], ... }
+    const out: Record<string, unknown> = {};
+    for (const [kind, list] of Object.entries(wing.strips)) out[kind] = list.map((s) => s.meter);
+    broadcast("meters", out);
   }, 66);
 });
 
@@ -168,6 +179,11 @@ const server = http.createServer(async (req, res) => {
     } catch (e) {
       sendJson(res, 502, { error: (e as Error).message });
     }
+  } else if (url.pathname === "/api/risk") {
+    // Aviso extra mostrado na confirmação da página (não fala com a mesa).
+    const path = url.searchParams.get("path") ?? "";
+    if (!isSafePath(path)) return sendJson(res, 400, { error: "Caminho inválido" });
+    sendJson(res, 200, { path, risk: riskWarning(path) });
   } else if (url.pathname === "/api/param") {
     const path = url.searchParams.get("path") ?? "";
     if (!isSafePath(path)) return sendJson(res, 400, { error: "Caminho inválido" });
@@ -185,14 +201,14 @@ const server = http.createServer(async (req, res) => {
     }
   } else if (url.pathname === "/api/state") {
     res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ status: wing.status, channels: wing.channels }));
+    res.end(JSON.stringify(snapshot()));
   } else if (url.pathname === "/api/events") {
     res.writeHead(200, {
       "content-type": "text/event-stream",
       "cache-control": "no-cache",
       connection: "keep-alive",
     });
-    res.write(`event: state\ndata: ${JSON.stringify({ status: wing.status, channels: wing.channels })}\n\n`);
+    res.write(`event: state\ndata: ${JSON.stringify(snapshot())}\n\n`);
     clients.add(res);
     req.on("close", () => clients.delete(res));
   } else {

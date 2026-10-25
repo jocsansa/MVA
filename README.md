@@ -43,17 +43,40 @@ Para liberar comandos:
 CONSOLE_HOST=<ip-da-wing> WING_ALLOW_WRITES=1 npm start
 ```
 
-Na página, o nome, o fader e o ganho de cada canal viram caixas de texto (Enter envia,
-Esc desfaz) e a etiqueta MUTE/ativo vira botão. Antes de enviar, a página mostra o comando
-exato e pede confirmação. Toda escrita aparece no terminal com os bytes, e o app lê o valor
-de volta para confirmar (a WING não ecoa escritas).
+A página tem uma aba por tipo de strip: Canais (40), Aux (8), Buses (16), Mains (4),
+Matrizes (8), DCAs (16) e Mute groups (8). Nome, fader, pan e ganho viram caixas de
+texto (Enter envia, Esc desfaz); MUTE e S (solo) viram botões; a barra colorida no topo
+abre a escolha de cor. Antes de enviar, a página mostra o comando exato e pede
+confirmação; main, DCA, mute group, phantom e patch mostram um aviso extra. Toda escrita
+aparece no terminal com os bytes, e o app lê o valor de volta para confirmar (a WING não
+ecoa escritas).
 
 | Comando | Mensagem |
 |---|---|
-| Renomear | `/ch/N/name ,s "<nome>"` (até 16 caracteres ASCII) |
-| Mutar / desmutar | `/ch/N/mute ,i 1` / `,i 0` (nunca o toggle `-1`) |
-| Fader | `/ch/N/fdr ,f <dB>` (-144 = -∞ até +10) |
-| Ganho | `/io/in/<grp>/<n>/g ,f <dB>` (-3 a 45,5; só LCL, A, B, C, SC) |
+| Renomear | `/<tipo>/N/name ,s "<nome>"` (até 16 caracteres ASCII) |
+| Mutar / desmutar | `/<tipo>/N/mute ,i 1` / `,i 0` (nunca o toggle `-1`) |
+| Solo | `/<tipo>/N/$solo ,i 1` / `,i 0` |
+| Fader | `/<tipo>/N/fdr ,f <dB>` (-144 = -∞ até +10) |
+| Pan | `/<tipo>/N/pan ,f <-100..100>` (DCA não tem pan) |
+| Cor | `/<tipo>/N/col ,i <1..18>` |
+| Ganho | `/io/in/<grp>/<n>/g ,f <dB>` (faixa lida da mesa; só LCL, A, B, C, SC) |
+
+`<tipo>` = `ch`, `aux`, `bus`, `main`, `mtx`, `dca` ou `mgrp` (mute group: só nome e mute).
+
+### Base genérica
+
+O app pergunta à própria mesa como é cada parte dela com a consulta de descrição de nó
+(`<nó> ,s #`, só leitura): tipo, faixa, opções e se é somente leitura. Toda escrita pela
+rota genérica (`POST /api/param`) é conferida contra essa descrição antes de sair.
+
+| Rota | O que faz |
+|---|---|
+| `GET /api/describe?path=/ch/1` | Descrição do nó com valores atuais e avisos de risco |
+| `GET /api/param?path=/ch/1/pan` | Lê um parâmetro |
+| `POST /api/param` `{path, value}` | Escreve um parâmetro (só com `WING_ALLOW_WRITES=1`) |
+
+Medidores: uma coleção por tipo (report id 1..6; tokens `0xa0`..`0xa5`), 8 valores por
+strip e 4 no DCA; a página mostra a saída (L/R).
 
 ### Ganho: cuidados
 

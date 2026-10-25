@@ -6,7 +6,7 @@
 <title>WING Remote</title>
 <style>
   :root { --bg:#121417; --panel:#1c1f24; --line:#2c3138; --text:#e6e8eb; --muted:#8b939e;
-          --green:#3fb950; --yellow:#d29922; --red:#f85149; --mute:#b62324; }
+          --green:#3fb950; --yellow:#d29922; --red:#f85149; --mute:#b62324; --solo:#d29922; }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font:14px/1.4 -apple-system, system-ui, sans-serif; }
   header { display:flex; gap:16px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
@@ -14,56 +14,67 @@
   .badge { padding:2px 8px; border-radius:10px; font-size:12px; background:var(--panel); border:1px solid var(--line); }
   .ok { color:var(--green); } .err { color:var(--red); }
   .ro { color:var(--yellow); }
-  #grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:8px; padding:16px; }
-  .ch { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:8px; display:flex; flex-direction:column; gap:6px; }
+  .badge.rw { color:var(--red); border-color:var(--red); }
+  nav { display:flex; gap:4px; padding:12px 16px 0; flex-wrap:wrap; }
+  nav button { font:inherit; padding:6px 12px; color:var(--muted); background:transparent; border:1px solid var(--line);
+    border-radius:6px; cursor:pointer; }
+  nav button.active { color:var(--text); background:var(--panel); border-color:var(--text); }
+  nav .count { font-size:11px; color:var(--muted); margin-left:4px; }
+  #grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(124px, 1fr)); gap:8px; padding:16px; }
+  .ch { position:relative; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:8px; padding-top:12px;
+    display:flex; flex-direction:column; gap:6px; overflow:hidden; }
   .ch.muted { border-color:var(--mute); }
+  .colbar { position:absolute; top:0; left:0; right:0; height:5px; border:0; padding:0; background:var(--line); }
+  body.writable .colbar { cursor:pointer; }
+  body.writable .colbar:hover { height:8px; }
   .num { color:var(--muted); font-size:11px; }
-  /* Nome: caixa de texto com a mesma aparência do texto; borda só ao passar o mouse/editar. */
   .name { width:100%; margin:0 -4px; padding:1px 4px; font:inherit; font-weight:600; color:var(--text);
     background:transparent; border:1px solid transparent; border-radius:3px; text-overflow:ellipsis; }
   .name::placeholder { color:var(--muted); font-weight:400; font-style:italic; }
   .name:read-only { cursor:default; }
-  body.writable .name:hover { border-color:var(--line); }
+  body.writable .name:not(:read-only):hover { border-color:var(--line); }
   body.writable .name:focus { outline:none; border-color:var(--text); background:#0b0c0e; }
-  .badge.rw { color:var(--red); border-color:var(--red); }
   .meter { height:90px; display:flex; gap:3px; align-items:flex-end; background:#0b0c0e; border-radius:3px; padding:2px; }
   .bar { flex:1; background:linear-gradient(to top, var(--green) 0 70%, var(--yellow) 70% 88%, var(--red) 88%); border-radius:2px;
          clip-path: inset(calc(100% - var(--h, 0%)) 0 0 0); height:100%; transition: clip-path 60ms linear; }
+  .btns { display:flex; gap:4px; }
+  .tag { flex:1; font:inherit; font-size:11px; font-weight:700; text-align:center; border-radius:3px; padding:1px;
+    border:1px solid var(--line); background:transparent; color:var(--muted); }
+  .tag:disabled { cursor:default; }
+  .tag.on.mute-tag { background:var(--mute); border-color:var(--mute); color:#fff; }
+  .tag.on.solo-tag { background:var(--solo); border-color:var(--solo); color:#111; }
+  .solo-tag { flex:0 0 26px; }
+  body.writable .tag:not(:disabled) { cursor:pointer; }
+  body.writable .tag:not(:disabled):hover { filter:brightness(1.3); border-color:var(--text); }
   .row { display:flex; justify-content:space-between; align-items:center; font-size:12px; }
   .row > span:first-child { color:var(--muted); }
-  /* Valores de fader/ganho: caixa de texto com cara de texto, como o nome. */
   .val { display:flex; align-items:center; gap:3px; }
   .num-in { width:4.2em; padding:0 3px; font:inherit; color:var(--text); text-align:right; background:transparent;
     border:1px solid transparent; border-radius:3px; }
   .num-in:read-only { cursor:default; }
   body.writable .num-in:not(:read-only):hover { border-color:var(--line); }
   body.writable .num-in:focus { outline:none; border-color:var(--text); background:#0b0c0e; }
-  .mute-tag { font:inherit; font-size:11px; font-weight:700; text-align:center; border-radius:3px; padding:1px;
-    border:1px solid transparent; background:transparent; color:inherit; }
-  .mute-tag.on { background:var(--mute); color:#fff; }
-  .mute-tag.off { color:var(--muted); border-color:var(--line); }
-  .mute-tag:disabled { cursor:default; }
-  body.writable .mute-tag:not(:disabled) { cursor:pointer; }
-  body.writable .mute-tag:not(:disabled):hover { filter:brightness(1.3); border-color:var(--text); }
   #ro-note { display:none; margin:12px 16px 0; padding:8px 12px; border:1px solid var(--yellow); border-radius:6px;
     color:var(--yellow); font-size:13px; }
   body:not(.writable) #ro-note { display:block; }
   #ro-note code { color:var(--text); }
   #dlg { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); z-index:10; }
   #dlg.open { display:flex; }
-  #dlg .box { width:min(420px, calc(100vw - 32px)); background:var(--panel); border:1px solid var(--line); border-radius:8px;
+  #dlg .box { width:min(440px, calc(100vw - 32px)); background:var(--panel); border:1px solid var(--line); border-radius:8px;
     padding:16px; display:flex; flex-direction:column; gap:12px; }
   #dlg h2 { margin:0; font-size:16px; }
-  #dlg input { font:inherit; padding:6px 8px; color:var(--text); background:#0b0c0e; border:1px solid var(--line); border-radius:4px; }
   #dlg .cmd { font-family:ui-monospace, Menlo, monospace; font-size:13px; background:#0b0c0e; padding:8px; border-radius:4px;
     overflow-wrap:anywhere; }
   #dlg .err { font-size:13px; min-height:1em; }
   #dlg .note { font-size:13px; color:var(--yellow); }
-  #dlg .note:empty { display:none; }
-  #dlg .btns { display:flex; gap:8px; justify-content:flex-end; }
-  #dlg button { font:inherit; padding:6px 14px; border-radius:4px; border:1px solid var(--line); background:#262a31; color:var(--text); cursor:pointer; }
+  #dlg .note:empty, #dlg .extra:empty { display:none; }
+  #dlg .btns { justify-content:flex-end; gap:8px; }
+  #dlg .btns button { font:inherit; padding:6px 14px; border-radius:4px; border:1px solid var(--line); background:#262a31; color:var(--text); cursor:pointer; }
   #dlg button.primary { background:var(--red); border-color:var(--red); color:#fff; font-weight:600; }
   #dlg button:disabled { opacity:.5; cursor:default; }
+  .swatches { display:grid; grid-template-columns:repeat(9, 1fr); gap:6px; }
+  .swatches button { aspect-ratio:1; border-radius:4px; border:2px solid transparent; cursor:pointer; font-size:10px; color:#111; }
+  .swatches button.sel { border-color:var(--text); }
   #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); max-width:calc(100vw - 32px); padding:8px 14px;
     border-radius:6px; background:var(--panel); border:1px solid var(--line); display:none; z-index:11; }
   #toast.show { display:block; }
@@ -78,13 +89,14 @@
   <span class="badge ro" id="mode">Somente leitura</span>
   <span id="info" class="num"></span>
 </header>
-<div id="ro-note">Somente leitura: para renomear e mutar pela página, inicie com
+<div id="ro-note">Somente leitura: para mudar valores pela página, inicie com
   <code>CONSOLE_HOST=&lt;ip&gt; WING_ALLOW_WRITES=1 npm start</code></div>
+<nav id="tabs"></nav>
 <div id="grid"></div>
 <div id="dlg" role="dialog" aria-modal="true">
   <div class="box">
     <h2 id="dlg-title"></h2>
-    <input id="dlg-input" maxlength="16" autocomplete="off">
+    <div class="extra" id="dlg-extra"></div>
     <div>Comando que será enviado à mesa:</div>
     <div class="cmd" id="dlg-cmd"></div>
     <div class="note" id="dlg-note"></div>
@@ -97,106 +109,74 @@
 </div>
 <div id="toast"></div>
 <script>
+  // Cores 1..18 da WING. Tons aproximados (a documentação não traz os valores RGB).
+  const COLORS = ["#6b7c93", "#3d6fd1", "#1f3f9e", "#2bb3c0", "#2f9e44", "#7a9a2f", "#e3c02b", "#e8862b", "#d63a3a",
+    "#e86a5a", "#e35d9c", "#9b59b6", "#5b4bb7", "#a0a0a0", "#ffffff", "#8b5a2b", "#c0a080", "#404040"];
+  const PREFIX = { ch: "CH", aux: "AUX", bus: "BUS", main: "MAIN", mtx: "MTX", dca: "DCA", mgrp: "MGRP" };
+
+  let kinds = [];
+  let strips = {};
+  let lastStatus = null;
+  let active = "ch";
+  try { active = localStorage.getItem("wing-tab") || "ch"; } catch {}
   const grid = document.getElementById("grid");
-  const cards = [];
-  // Faixa do medidor: -60 dB .. 0 dB
+  const cards = {}; // "ch/1" -> elementos
+
+  // ---------- formatação e leitura de valores digitados ----------
   const pct = (db) => db == null ? 0 : Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
   const fmtNum = (v) => v == null ? "—" : v <= -144 ? "-∞" : v.toFixed(1);
-  // Aceita "-3", "-3,5", "+2", "-inf", "-oo", "-∞".
+  const fmtDb = (v) => (v <= -144 ? "-∞" : (v > 0 ? "+" : "") + v.toFixed(1)) + " dB";
+  const fmtPan = (v) => v == null ? "—" : Math.round(v) === 0 ? "C" : (v < 0 ? "L" : "R") + Math.abs(Math.round(v));
   function parseDb(text) {
     const t = text.trim().toLowerCase().replace(",", ".").replace(/\s*db$/, "");
     if (["-∞", "-inf", "-oo", "-infinito"].includes(t)) return -144;
     if (!/^[+-]?\d+(\.\d+)?$/.test(t)) return NaN;
-    return Number(t);
+    return Math.round(Number(t) * 10) / 10;
+  }
+  // "L30" -> -30, "R20" -> 20, "C" -> 0, "-15" -> -15
+  function parsePan(text) {
+    const t = text.trim().toUpperCase().replace(",", ".");
+    if (t === "C" || t === "0") return 0;
+    const m = /^([LR])\s*(\d+)$/.exec(t);
+    if (m) return (m[1] === "L" ? -1 : 1) * Number(m[2]);
+    if (/^[+-]?\d+$/.test(t)) return Number(t);
+    return NaN;
   }
 
-  // Caixa numérica: Enter/sair confirma, Esc desfaz; não chega ao Enter da janela.
-  // dataset.editing fica "1" do foco até a janela fechar; enquanto isso a tela não sobrescreve o valor.
-  function bindNumberInput(input, currentText, onCommit) {
-    input.addEventListener("focus", () => { if (!input.readOnly) { input.dataset.editing = "1"; input.select(); } });
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); input.blur(); }
-      if (e.key === "Escape") { input.value = currentText(); input.blur(); }
-    });
-    input.addEventListener("blur", () => {
-      if (input.value !== currentText()) onCommit(input.value);
-      else delete input.dataset.editing;
-    });
-  }
-  function endEdit(input, text) {
-    delete input.dataset.editing;
-    input.value = text;
-  }
-
-  function card(i) {
-    if (cards[i]) return cards[i];
-    const el = document.createElement("div");
-    el.className = "ch";
-    el.innerHTML = `<div class="num">CH ${i + 1}</div>
-      <input class="name" maxlength="16" placeholder="(sem nome)" spellcheck="false" autocomplete="off" readonly>
-      <div class="meter"><div class="bar"></div><div class="bar"></div></div>
-      <button type="button" class="mute-tag" disabled></button>
-      <label class="row"><span>Fader</span><span class="val"><input class="num-in fdr" readonly autocomplete="off"> dB</span></label>
-      <label class="row"><span>Ganho</span><span class="val"><input class="num-in gain" readonly autocomplete="off"> dB</span></label>`;
-    grid.appendChild(el);
-    const c = cards[i] = { el, name: el.querySelector(".name"), bars: el.querySelectorAll(".bar"),
-      mute: el.querySelector(".mute-tag"), fdr: el.querySelector(".fdr"), gain: el.querySelector(".gain"),
-      current: "", muted: null, faderDb: null, gainDb: null };
-    c.mute.addEventListener("click", () => toggleMute(i + 1));
-    c.fdr.value = c.gain.value = fmtNum(null);
-    bindNumberInput(c.fdr, () => fmtNum(c.faderDb), (text) => setFader(i + 1, text));
-    bindNumberInput(c.gain, () => fmtNum(c.gainDb), (text) => setGain(i + 1, text));
-    // Edição do nome no próprio card: Enter confirma, Esc desfaz.
-    c.name.addEventListener("keydown", (e) => {
-      // stopPropagation: este Enter não pode chegar ao Enter da janela de confirmação.
-      if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); c.name.blur(); }
-      if (e.key === "Escape") { c.name.value = c.current; c.name.blur(); }
-    });
-    c.name.addEventListener("blur", () => {
-      if (c.name.value !== c.current) rename(i + 1, c.name.value);
-    });
-    return c;
-  }
-
-  // Janela de confirmação dentro da página (não usa prompt/confirm do navegador,
-  // que alguns navegadores bloqueiam sem avisar).
+  // ---------- janela de confirmação ----------
   const dlg = {
     root: document.getElementById("dlg"), title: document.getElementById("dlg-title"),
-    input: document.getElementById("dlg-input"), cmd: document.getElementById("dlg-cmd"),
-    note: document.getElementById("dlg-note"),
-    err: document.getElementById("dlg-err"), ok: document.getElementById("dlg-ok"),
-    cancel: document.getElementById("dlg-cancel"), action: null,
+    extra: document.getElementById("dlg-extra"), cmd: document.getElementById("dlg-cmd"),
+    note: document.getElementById("dlg-note"), err: document.getElementById("dlg-err"),
+    ok: document.getElementById("dlg-ok"), cancel: document.getElementById("dlg-cancel"), action: null, onCancel: null,
   };
-  function openDialog({ title, input, buildCmd, send, onCancel, note }) {
-    dlg.onCancel = onCancel || null;
-    dlg.note.textContent = note || "";
+  function openDialog({ title, cmd, error, note, extra, send, onCancel }) {
     dlg.title.textContent = title;
-    dlg.input.style.display = input == null ? "none" : "";
-    dlg.input.value = input ?? "";
-    dlg.err.textContent = "";
-    dlg.ok.disabled = false;
-    const refresh = () => {
-      const r = buildCmd(dlg.input.value);
-      dlg.cmd.textContent = r.cmd ?? "—";
-      dlg.err.textContent = r.error ?? "";
-      dlg.ok.disabled = !!r.error;
-    };
-    dlg.input.oninput = refresh;
-    refresh();
+    dlg.cmd.textContent = cmd || "—";
+    dlg.err.textContent = error || "";
+    dlg.note.textContent = note || "";
+    dlg.extra.replaceChildren(...(extra ? [extra] : []));
+    dlg.ok.disabled = !!error;
+    dlg.onCancel = onCancel || null;
     let busy = false;
     dlg.action = async () => {
       if (busy || dlg.ok.disabled) return; // um clique = uma escrita
       busy = true;
       dlg.ok.disabled = true;
       dlg.err.textContent = "Enviando…";
-      const msg = await send(dlg.input.value);
+      const msg = await send();
       busy = false;
       if (msg) { dlg.err.textContent = msg; dlg.ok.disabled = false; return; }
       dlg.onCancel = null;
       closeDialog();
     };
     dlg.root.classList.add("open");
-    if (input != null) { dlg.input.focus(); dlg.input.select(); } else dlg.ok.focus();
+    dlg.ok.focus();
+  }
+  function setDialogCmd(cmd, error) {
+    dlg.cmd.textContent = cmd || "—";
+    dlg.err.textContent = error || "";
+    dlg.ok.disabled = !!error;
   }
   function closeDialog() {
     dlg.root.classList.remove("open");
@@ -223,158 +203,273 @@
     toastTimer = setTimeout(() => (t.className = ""), 4000);
   }
 
-  // Retorna null em caso de sucesso, ou a mensagem de erro.
-  async function post(path, body, describeReadBack) {
+  // ---------- envio ----------
+  async function postJson(url, body) {
     try {
-      const res = await fetch(path, {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
-      });
+      const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       const data = await res.json();
-      if (!res.ok) return "Erro: " + data.error;
-      if (!data.ok) return "A mesa não confirmou. Valor lido: " + describeReadBack(data.readBack);
-      return null;
+      if (!res.ok) return { error: "Erro: " + data.error };
+      return { data };
     } catch (e) {
-      return "Falha: " + e.message;
+      return { error: "Falha: " + e.message };
     }
   }
+  async function riskFor(path) {
+    try { return (await (await fetch("/api/risk?path=" + encodeURIComponent(path))).json()).risk || ""; } catch { return ""; }
+  }
 
-  function toggleMute(ch) {
-    if (!lastStatus || !lastStatus.writesEnabled) return;
-    const current = cards[ch - 1].muted;
-    if (current == null) return;
-    const mute = !current;
-    const label = cards[ch - 1].current || `CH ${ch}`;
+  /**
+   * Confirma e envia um parâmetro pela rota genérica (/api/param), que valida contra a
+   * descrição da própria mesa. argText: como o comando aparece na janela.
+   */
+  async function confirmParam({ path, value, argText, title, note, onCancel, done }) {
+    const risk = await riskFor(path);
     openDialog({
-      title: `${mute ? "Mutar" : "Desmutar"} "${label}" (canal ${ch})?`,
-      buildCmd: () => ({ cmd: `/ch/${ch}/mute ,i ${mute ? 1 : 0}` }),
+      title,
+      cmd: `${path} ${argText}`,
+      note: [risk, note].filter(Boolean).join(" "),
       send: async () => {
-        const err = await post(`/api/channels/${ch}/mute`, { mute }, (v) => (v ? "mutado" : "desmutado"));
-        if (!err) toast(`Canal ${ch} ${mute ? "mutado" : "desmutado"}`);
-        return err;
+        const r = await postJson("/api/param", { path, value });
+        if (r.error) return r.error;
+        if (!r.data.ok) return `A mesa não confirmou. Valor lido: ${r.data.readBack.text}`;
+        if (done) done();
+        return null;
+      },
+      onCancel,
+    });
+  }
+
+  // ---------- campos editáveis (Enter confirma, Esc desfaz) ----------
+  function bindEditable(input, currentText, onCommit) {
+    input.addEventListener("focus", () => { if (!input.readOnly) { input.dataset.editing = "1"; input.select(); } });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); input.blur(); }
+      if (e.key === "Escape") { input.value = currentText(); input.blur(); }
+    });
+    input.addEventListener("blur", () => {
+      if (input.value !== currentText()) onCommit(input.value);
+      else delete input.dataset.editing;
+    });
+  }
+  function endEdit(input, text) { delete input.dataset.editing; input.value = text; }
+
+  const label = (st) => st.name || `${PREFIX[st.kind]} ${st.index}`;
+  // Estado atual do strip (o objeto é trocado a cada evento da mesa).
+  const now = (st) => strips[st.kind][st.index - 1];
+  const writable = () => !!(lastStatus && lastStatus.writesEnabled);
+
+  function editName(st, c, text) {
+    const revert = () => endEdit(c.name, now(st).name);
+    if (!writable()) return revert();
+    let error = null;
+    if (text.length > 16) error = "Máximo de 16 caracteres.";
+    else if (!/^[\x20-\x7e]*$/.test(text)) error = "Use só letras sem acento, números e símbolos.";
+    const path = `/${st.kind}/${st.index}/name`;
+    confirmParam({
+      path, value: text, argText: `,s ${JSON.stringify(text)}`,
+      title: `Renomear ${PREFIX[st.kind]} ${st.index}: ${JSON.stringify(st.name)} → ${JSON.stringify(text)}`,
+      onCancel: revert, done: () => { toast(`${PREFIX[st.kind]} ${st.index} renomeado`); revert(); },
+    }).then(() => error && setDialogCmd(dlg.cmd.textContent, error));
+  }
+
+  function editFader(st, c, text) {
+    const revert = () => endEdit(c.fdr, fmtNum(now(st).faderDb));
+    if (!writable()) return revert();
+    const db = parseDb(text);
+    const path = `/${st.kind}/${st.index}/fdr`;
+    const error = Number.isNaN(db) ? "Digite um número em dB (ex.: -5, 0, +3) ou -inf." : (db < -144 || db > 10) ? "O fader vai de -∞ (-144) até +10 dB." : null;
+    confirmParam({
+      path, value: db, argText: `,f ${db}`,
+      title: `Fader "${label(st)}": ${fmtDb(st.faderDb ?? -144)} → ${error ? text : fmtDb(db)}`,
+      note: !error && db > (st.faderDb ?? -144) + 6 ? "Atenção: aumento de mais de 6 dB." : "",
+      onCancel: revert, done: () => { toast(`Fader de ${label(st)} em ${fmtDb(db)}`); revert(); },
+    }).then(() => error && setDialogCmd("—", error));
+  }
+
+  function editPan(st, c, text) {
+    const revert = () => endEdit(c.pan, fmtPan(now(st).pan));
+    if (!writable()) return revert();
+    const v = parsePan(text);
+    const path = `/${st.kind}/${st.index}/pan`;
+    const error = Number.isNaN(v) ? "Use L30, R20, C ou um número de -100 a 100." : (v < -100 || v > 100) ? "O pan vai de L100 a R100." : null;
+    confirmParam({
+      path, value: v, argText: `,f ${v}`,
+      title: `Pan "${label(st)}": ${fmtPan(st.pan)} → ${error ? text : fmtPan(v)}`,
+      onCancel: revert, done: () => { toast(`Pan de ${label(st)} em ${fmtPan(v)}`); revert(); },
+    }).then(() => error && setDialogCmd("—", error));
+  }
+
+  function toggle(st, key, param, word) {
+    if (!writable() || st[key] == null) return;
+    const on = !st[key];
+    confirmParam({
+      path: `/${st.kind}/${st.index}/${param}`, value: on ? 1 : 0, argText: `,i ${on ? 1 : 0}`,
+      title: `${on ? word[0] : word[1]} "${label(st)}"?`,
+      done: () => toast(`${label(st)}: ${on ? word[2] : word[3]}`),
+    });
+  }
+
+  function editColor(st) {
+    if (!writable()) return;
+    const box = document.createElement("div");
+    box.className = "swatches";
+    const path = `/${st.kind}/${st.index}/col`;
+    let sendColor = st.col;
+    COLORS.forEach((hex, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.style.background = hex;
+      b.textContent = i + 1;
+      b.title = `Cor ${i + 1}`;
+      if (i + 1 === st.col) b.classList.add("sel");
+      b.addEventListener("click", () => {
+        sendColor = i + 1;
+        box.querySelectorAll("button").forEach((x) => x.classList.toggle("sel", x === b));
+        setDialogCmd(`${path} ,i ${sendColor}`, sendColor === st.col ? "Essa já é a cor atual." : null);
+      });
+      box.appendChild(b);
+    });
+    openDialog({
+      title: `Cor de "${label(st)}"`, extra: box, cmd: `${path} ,i ${sendColor}`, error: "Escolha uma cor.",
+      send: async () => {
+        const r = await postJson("/api/param", { path, value: sendColor });
+        if (r.error) return r.error;
+        if (!r.data.ok) return `A mesa não confirmou. Valor lido: ${r.data.readBack.text}`;
+        toast(`Cor de ${label(st)} alterada`);
+        return null;
       },
     });
   }
 
-  function rename(ch, name) {
-    const c = cards[ch - 1];
-    if (!lastStatus || !lastStatus.writesEnabled) { c.name.value = c.current; return; }
-    const current = c.current;
-    let error = null;
-    if (name.length > 16) error = "Máximo de 16 caracteres.";
-    else if (!/^[\x20-\x7e]*$/.test(name)) error = "Use só letras sem acento, números e símbolos.";
-    openDialog({
-      title: `Renomear canal ${ch}: ${JSON.stringify(current)} → ${JSON.stringify(name)}`,
-      buildCmd: () => ({ cmd: `/ch/${ch}/name ,s ${JSON.stringify(name)}`, error }),
-      send: async () => {
-        const err = await post(`/api/channels/${ch}/name`, { name }, (v) => JSON.stringify(v));
-        if (!err) toast(`Canal ${ch} renomeado para ${JSON.stringify(name)}`);
-        return err;
-      },
-      // Cancelou: volta o texto da caixa para o nome que está na mesa.
-      onCancel: () => { c.name.value = c.current; },
-    });
-  }
-
-  const fmtSet = (v) => (v <= -144 ? "-∞" : (v > 0 ? "+" : "") + v.toFixed(1)) + " dB";
-
-  function setFader(ch, text) {
-    const c = cards[ch - 1];
-    const revert = () => endEdit(c.fdr, fmtNum(c.faderDb));
-    if (!lastStatus || !lastStatus.writesEnabled) return revert();
-    const db = Math.round(parseDb(text) * 10) / 10;
-    let error = null;
-    if (Number.isNaN(db)) error = "Digite um número em dB (ex.: -5, 0, +3) ou -inf.";
-    else if (db < -144 || db > 10) error = "O fader vai de -∞ (-144) até +10 dB.";
-    const label = c.current || `CH ${ch}`;
-    openDialog({
-      title: `Fader "${label}" (canal ${ch}): ${fmtSet(c.faderDb ?? -144)} → ${error ? text : fmtSet(db)}`,
-      buildCmd: () => ({ cmd: error ? "—" : `/ch/${ch}/fdr ,f ${db}`, error }),
-      note: !error && db > (c.faderDb ?? -144) + 6 ? "Atenção: aumento de mais de 6 dB." : "",
-      send: async () => {
-        const err = await post(`/api/channels/${ch}/fader`, { db }, (v) => fmtSet(v));
-        if (!err) { toast(`Fader do canal ${ch} em ${fmtSet(db)}`); revert(); }
-        return err;
-      },
-      onCancel: revert,
-    });
-  }
-
-  async function setGain(ch, text) {
-    const c = cards[ch - 1];
-    const revert = () => endEdit(c.gain, fmtNum(c.gainDb));
-    if (!lastStatus || !lastStatus.writesEnabled) return revert();
-    const db = Math.round(parseDb(text) * 10) / 10;
-    let error = null;
-    if (Number.isNaN(db)) error = "Digite um número em dB (ex.: 20, 32.5).";
-    else if (db < -3 || db > 45.5) error = "O ganho vai de -3 até +45,5 dB.";
-    // Lê (sem escrever) qual fonte alimenta o canal: o ganho é ajustado nela.
+  // Ganho fica na fonte do canal: rota própria que confere a fonte antes de escrever.
+  async function editGain(st, c, text) {
+    const revert = () => endEdit(c.gain, fmtNum(now(st).gainDb));
+    if (!writable()) return revert();
+    const db = parseDb(text);
+    let error = Number.isNaN(db) ? "Digite um número em dB (ex.: 20, 32.5)." : null;
     let src = null;
     try {
-      const res = await fetch(`/api/channels/${ch}/source`);
+      const res = await fetch(`/api/channels/${st.index}/source`);
       src = await res.json();
       if (!res.ok) error = error || src.error;
       else if (!src.gainAddress) error = error || `Este canal usa a fonte ${src.grp} ${src.in}, que não tem ganho ajustável.`;
     } catch (e) {
       error = error || "Não foi possível ler a fonte do canal: " + e.message;
     }
-    const label = c.current || `CH ${ch}`;
     const srcName = src && src.grp ? `${src.grp} ${src.in}${src.alt ? " (entrada alternativa)" : ""}` : "?";
     openDialog({
-      title: `Ganho "${label}" (canal ${ch}): ${fmtSet(c.gainDb ?? 0)} → ${error ? text : fmtSet(db)}`,
-      buildCmd: () => ({ cmd: error || !src ? "—" : `${src.gainAddress} ,f ${db}`, error }),
+      title: `Ganho "${label(st)}": ${fmtDb(st.gainDb ?? 0)} → ${error ? text : fmtDb(db)}`,
+      cmd: error || !src ? "—" : `${src.gainAddress} ,f ${db}`, error,
       note: error ? "" : `O ganho fica na fonte ${srcName}: muda em todos os canais que usam essa fonte.` +
-        (db > (c.gainDb ?? 0) + 6 ? " Atenção: aumento de mais de 6 dB." : ""),
+        (db > (st.gainDb ?? 0) + 6 ? " Atenção: aumento de mais de 6 dB." : ""),
       send: async () => {
-        const err = await post(`/api/channels/${ch}/gain`, { db }, (v) => fmtSet(v));
-        if (!err) { toast(`Ganho do canal ${ch} (${srcName}) em ${fmtSet(db)}`); revert(); }
-        return err;
+        const r = await postJson(`/api/channels/${st.index}/gain`, { db });
+        if (r.error) return r.error;
+        if (!r.data.ok) return `A mesa não confirmou. Valor lido: ${fmtDb(r.data.readBack)}`;
+        toast(`Ganho de ${label(st)} (${srcName}) em ${fmtDb(db)}`);
+        revert();
+        return null;
       },
       onCancel: revert,
     });
   }
 
-  function renderChannel(st) {
-    const c = card(st.index - 1);
-    // Não sobrescreve o texto enquanto a pessoa está editando ou confirmando.
-    const editing = document.activeElement === c.name || c.name.value !== c.current;
-    c.current = st.name;
-    c.muted = st.mute;
-    if (!editing) c.name.value = st.name;
+  // ---------- cards ----------
+  function info(kind) { return kinds.find((k) => k.kind === kind); }
+  const has = (kind, p) => info(kind).params.includes(p);
+
+  function card(st) {
+    const key = `${st.kind}/${st.index}`;
+    if (cards[key]) return cards[key];
+    const k = info(st.kind);
+    const el = document.createElement("div");
+    el.className = "ch";
+    el.innerHTML = `${has(st.kind, "col") ? '<button type="button" class="colbar" title="Cor"></button>' : ""}
+      <div class="num">${PREFIX[st.kind]} ${st.index}</div>
+      <input class="name" maxlength="16" placeholder="(sem nome)" spellcheck="false" autocomplete="off" readonly>
+      ${k.meter ? '<div class="meter"><div class="bar"></div><div class="bar"></div></div>' : ""}
+      <div class="btns"><button type="button" class="tag mute-tag" disabled></button>
+        ${has(st.kind, "$solo") ? '<button type="button" class="tag solo-tag" disabled title="Solo">S</button>' : ""}</div>
+      ${has(st.kind, "fdr") ? '<label class="row"><span>Fader</span><span class="val"><input class="num-in fdr" readonly autocomplete="off"> dB</span></label>' : ""}
+      ${has(st.kind, "pan") ? '<label class="row"><span>Pan</span><span class="val"><input class="num-in pan" readonly autocomplete="off"></span></label>' : ""}
+      ${has(st.kind, "in/set/$g") ? '<label class="row"><span>Ganho</span><span class="val"><input class="num-in gain" readonly autocomplete="off"> dB</span></label>' : ""}`;
+    const c = {
+      el, st, colbar: el.querySelector(".colbar"), name: el.querySelector(".name"), bars: el.querySelectorAll(".bar"),
+      mute: el.querySelector(".mute-tag"), solo: el.querySelector(".solo-tag"),
+      fdr: el.querySelector(".fdr"), pan: el.querySelector(".pan"), gain: el.querySelector(".gain"),
+    };
+    const cur = () => strips[st.kind][st.index - 1];
+    bindEditable(c.name, () => cur().name, (t) => editName(cur(), c, t));
+    c.mute.addEventListener("click", () => toggle(cur(), "mute", "mute", ["Mutar", "Desmutar", "mutado", "desmutado"]));
+    if (c.solo) c.solo.addEventListener("click", () => toggle(cur(), "solo", "$solo", ["Ligar solo de", "Desligar solo de", "solo ligado", "solo desligado"]));
+    if (c.colbar) c.colbar.addEventListener("click", () => editColor(cur()));
+    if (c.fdr) { c.fdr.value = "—"; bindEditable(c.fdr, () => fmtNum(cur().faderDb), (t) => editFader(cur(), c, t)); }
+    if (c.pan) { c.pan.value = "—"; bindEditable(c.pan, () => fmtPan(cur().pan), (t) => editPan(cur(), c, t)); }
+    if (c.gain) { c.gain.value = "—"; bindEditable(c.gain, () => fmtNum(cur().gainDb), (t) => editGain(cur(), c, t)); }
+    cards[key] = c;
+    return c;
+  }
+
+  function render(st) {
+    strips[st.kind][st.index - 1] = st;
+    if (st.kind !== active) return;
+    const c = card(st);
+    if (!c.name.dataset.editing && c.name.value !== st.name && document.activeElement !== c.name) c.name.value = st.name;
+    if (c.colbar) c.colbar.style.background = st.col ? COLORS[st.col - 1] : "var(--line)";
     c.el.classList.toggle("muted", st.mute === true);
     c.mute.textContent = st.mute == null ? "—" : st.mute ? "MUTE" : "ativo";
-    c.mute.className = "mute-tag " + (st.mute ? "on" : "off");
-    // Mesma regra do nome: não sobrescreve um valor em edição.
-    for (const [input, key] of [[c.fdr, "faderDb"], [c.gain, "gainDb"]]) {
-      c[key] = st[key];
-      if (!input.dataset.editing) input.value = fmtNum(st[key]);
+    c.mute.classList.toggle("on", st.mute === true);
+    if (c.solo) c.solo.classList.toggle("on", st.solo === true);
+    if (c.fdr && !c.fdr.dataset.editing) c.fdr.value = fmtNum(st.faderDb);
+    if (c.pan && !c.pan.dataset.editing) c.pan.value = fmtPan(st.pan);
+    if (c.gain && !c.gain.dataset.editing) c.gain.value = fmtNum(st.gainDb);
+    const w = writable();
+    c.name.readOnly = !w;
+    c.mute.disabled = !w || st.mute == null;
+    if (c.solo) c.solo.disabled = !w || st.solo == null;
+    if (c.colbar) c.colbar.disabled = !w;
+    if (c.fdr) c.fdr.readOnly = !w || st.faderDb == null;
+    if (c.pan) c.pan.readOnly = !w || st.pan == null;
+    if (c.gain) c.gain.readOnly = !w || st.gainDb == null;
+    renderMeter(st);
+  }
+
+  function renderMeter(st) {
+    const c = cards[`${st.kind}/${st.index}`];
+    if (!c || !c.bars.length || st.kind !== active) return;
+    c.bars[0].style.setProperty("--h", pct(st.meter && st.meter.l) + "%");
+    c.bars[1].style.setProperty("--h", pct(st.meter && st.meter.r) + "%");
+  }
+
+  function showTab(kind) {
+    if (!info(kind)) kind = "ch";
+    active = kind;
+    try { localStorage.setItem("wing-tab", kind); } catch {}
+    document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.kind === kind));
+    grid.replaceChildren();
+    for (const st of strips[kind]) grid.appendChild(card(st).el);
+    for (const st of strips[kind]) render(st);
+  }
+
+  function buildTabs() {
+    const nav = document.getElementById("tabs");
+    nav.replaceChildren();
+    for (const k of kinds) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.dataset.kind = k.kind;
+      b.innerHTML = `${k.label}<span class="count">${k.count}</span>`;
+      b.addEventListener("click", () => showTab(k.kind));
+      nav.appendChild(b);
     }
-    updateButtons(c);
-    if (st.meter) renderMeter(st.index - 1, st.meter);
   }
 
-  function renderMeter(i, m) {
-    const c = card(i);
-    if (!m) return;
-    // Medidor pós-processamento (saída do canal), L e R
-    c.bars[0].style.setProperty("--h", pct(m.outL) + "%");
-    c.bars[1].style.setProperty("--h", pct(m.outR) + "%");
-  }
-
-  function updateButtons(c) {
-    const writable = !!(lastStatus && lastStatus.writesEnabled);
-    c.name.readOnly = !writable;
-    c.fdr.readOnly = !writable || c.faderDb == null;
-    c.gain.readOnly = !writable || c.gainDb == null;
-    c.mute.disabled = !writable || c.muted == null;
-    c.name.title = writable ? "Clique para renomear" : "";
-    c.mute.title = writable ? (c.muted ? "Clique para desmutar" : "Clique para mutar") : "";
-  }
-
+  // ---------- status ----------
   function renderStatus(s) {
     document.getElementById("host").textContent = "Mesa: " + s.host;
     const wasWritable = document.body.classList.contains("writable");
     document.body.classList.toggle("writable", !!s.writesEnabled);
-    if (wasWritable !== !!s.writesEnabled) cards.forEach((c) => c && updateButtons(c));
+    if (wasWritable !== !!s.writesEnabled && strips[active]) strips[active].forEach(render);
     const mode = document.getElementById("mode");
     mode.textContent = s.writesEnabled ? "Escrita liberada" : "Somente leitura";
     mode.className = "badge " + (s.writesEnabled ? "rw" : "ro");
@@ -390,18 +485,25 @@
     document.getElementById("info").textContent = (s.consoleInfo || "") + (s.error ? " · " + s.error : "");
   }
 
-  let lastStatus = null;
+  // ---------- eventos do servidor ----------
   const es = new EventSource("/api/events");
   es.addEventListener("state", (e) => {
-    const { status, channels } = JSON.parse(e.data);
-    lastStatus = status;
-    channels.forEach(renderChannel);
-    renderStatus(status);
+    const snap = JSON.parse(e.data);
+    kinds = snap.kinds;
+    strips = snap.strips;
+    lastStatus = snap.status;
+    buildTabs();
+    renderStatus(lastStatus);
+    showTab(active);
   });
-  es.addEventListener("channel", (e) => renderChannel(JSON.parse(e.data)));
+  es.addEventListener("strip", (e) => { if (kinds.length) render(JSON.parse(e.data)); });
   es.addEventListener("status", (e) => { lastStatus = JSON.parse(e.data); renderStatus(lastStatus); });
   es.addEventListener("meters", (e) => {
-    JSON.parse(e.data).forEach((m, i) => renderMeter(i, m));
+    const all = JSON.parse(e.data);
+    for (const [kind, list] of Object.entries(all)) {
+      if (!strips[kind]) continue;
+      list.forEach((m, i) => { const st = strips[kind][i]; if (st) { st.meter = m; renderMeter(st); } });
+    }
     if (lastStatus) { lastStatus.lastMeterAt = Date.now(); renderStatus(lastStatus); }
   });
   setInterval(async () => {

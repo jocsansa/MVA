@@ -19,12 +19,21 @@ import {
 import {
   METER_CHANNEL,
   encodeChannelData,
-  meterChannelsRequest,
   meterPortRequest,
   meterRenewRequest,
-  parseChannelMeters,
-  type ChannelMeter,
+  meterRequest,
+  parseMeterWords,
 } from "./native.ts";
+import {
+  STRIP_KINDS,
+  applyStripValue,
+  createStrips,
+  meterReportId,
+  stripMeterFromWords,
+  stripPaths,
+  type StripState,
+  type Strips,
+} from "./strips.ts";
 
 export const OSC_PORT = 2223;
 export const NATIVE_PORT = 2222;
@@ -33,16 +42,9 @@ export const CHANNEL_COUNT = 40;
 const SUBSCRIBE_EVERY_MS = 8000; // assinatura morre após 10 s
 const OSC_SILENCE_MS = 12000; // sem resposta OSC por esse tempo: recria o socket
 const METER_RENEW_EVERY_MS = 3000; // medidores param após 5 s
-const METER_REPORT_ID = 1;
 
-export interface ChannelState {
-  index: number;
-  name: string;
-  mute: boolean | null;
-  faderDb: number | null;
-  gainDb: number | null;
-  meter: ChannelMeter | null;
-}
+/** Estado de um canal: mesmo formato de qualquer strip. */
+export type ChannelState = StripState;
 
 /** Endereços lidos por canal. */
 export function channelAddresses(ch: number) {
@@ -55,7 +57,6 @@ export function channelAddresses(ch: number) {
   };
 }
 
-const CHANNEL_PATH = /^\/ch\/(\d+)\/(name|mute|fdr|in\/set\/\$g)$/;
 
 export const NAME_MAX_LENGTH = 16; // "/ch/N/name  S  16 chars max"
 
@@ -145,8 +146,8 @@ export function describeMessage(m: OscMessage): string {
 export interface WingEvents {
   info: [string];
   reply: [string];
-  channel: [ChannelState];
-  meters: [ChannelState[]];
+  strip: [StripState];
+  meters: [Strips];
   status: [WingStatus];
   osc: [string, WingValue];
 }
@@ -161,7 +162,10 @@ export interface WingStatus {
 }
 
 export class WingClient extends EventEmitter<WingEvents> {
-  readonly channels: ChannelState[];
+  readonly strips: Strips = createStrips();
+  get channels(): StripState[] {
+    return this.strips.ch;
+  }
   readonly status: WingStatus;
   private osc!: dgram.Socket;
   private startedAt = 0;
@@ -192,14 +196,6 @@ export class WingClient extends EventEmitter<WingEvents> {
     this.host = host;
     this.ports = opts.ports ?? { osc: OSC_PORT, native: NATIVE_PORT };
     this.allowWrites = opts.allowWrites ?? false;
-    this.channels = Array.from({ length: CHANNEL_COUNT }, (_, i) => ({
-      index: i + 1,
-      name: "",
-      mute: null,
-      faderDb: null,
-      gainDb: null,
-      meter: null,
-    }));
     this.status = { host, writesEnabled: this.allowWrites, consoleInfo: null, lastOscAt: null, lastMeterAt: null, error: null };
   }
 
@@ -227,7 +223,7 @@ export class WingClient extends EventEmitter<WingEvents> {
       this.startedAt = Date.now();
       this.get("/?");
       this.get("/*s");
-      await this.readAllChannels();
+      await this.readAllStrips();
     } finally {
       this.reconnecting = false;
     }
@@ -242,7 +238,7 @@ export class WingClient extends EventEmitter<WingEvents> {
 
     this.startedAt = Date.now();
     this.get("/?");
-    await this.readAllChannels();
+    await this.readAllStrips();
 
     this.get("/*s");
     // Heartbeat: "/?" é só leitura e mantém lastOscAt atualizado.
@@ -254,7 +250,7 @@ export class WingClient extends EventEmitter<WingEvents> {
     );
     this.timers.push(setInterval(() => this.get("/*s"), SUBSCRIBE_EVERY_MS));
     // Releitura periódica: cobre eventos perdidos (UDP) e serve de keep-alive.
-    this.timers.push(setInterval(() => void this.readAllChannels(), 30000));
+    this.timers.push(setInterval(() => void this.readAllStrips(), 30000));
 
     this.connectMeters();
   }
@@ -428,15 +424,13 @@ export class WingClient extends EventEmitter<WingEvents> {
     });
   }
 
-  private async readAllChannels(): Promise<void> {
-    for (let ch = 1; ch <= CHANNEL_COUNT; ch++) {
-      const a = channelAddresses(ch);
-      this.get(a.name);
-      this.get(a.mute);
-      this.get(a.fader);
-      this.get(a.gain);
-      // Espaça os pedidos para não estourar o buffer UDP da mesa.
-      await new Promise((r) => setTimeout(r, 5));
+  private async readAllStrips(): Promise<void> {
+    for (const k of STRIP_KINDS) {
+      for (let i = 1; i <= k.count; i++) {
+        for (const p of stripPaths(k.kind, i)) this.get(p);
+        // Espaça os pedidos para não estourar o buffer UDP da mesa.
+        await new Promise((r) => setTimeout(r, 5));
+      }
     }
   }
 
@@ -465,7 +459,8 @@ export class WingClient extends EventEmitter<WingEvents> {
     const value = parseWingValue(msg.args);
     if (!value) return;
     this.emit("osc", msg.address, value);
-    applyChannelValue(this.channels, msg.address, value, (st) => this.emit("channel", st));
+    const st = applyStripValue(this.strips, msg.address, value);
+    if (st) this.emit("strip", st);
   }
 
   private connectMeters(): void {
@@ -476,12 +471,15 @@ export class WingClient extends EventEmitter<WingEvents> {
     sock.on("connect", () => {
       const port = this.meterUdp.address().port;
       sock.write(encodeChannelData(METER_CHANNEL, meterPortRequest(port)));
-      const channels = Array.from({ length: CHANNEL_COUNT }, (_, i) => i + 1);
-      sock.write(encodeChannelData(METER_CHANNEL, meterChannelsRequest(METER_REPORT_ID, channels)));
-      renew = setInterval(
-        () => sock.write(encodeChannelData(METER_CHANNEL, meterRenewRequest(METER_REPORT_ID))),
-        METER_RENEW_EVERY_MS,
-      );
+      // Uma coleção por tipo de strip, cada uma com seu report id.
+      const kinds = STRIP_KINDS.filter((k) => k.meter);
+      for (const k of kinds) {
+        const indices = Array.from({ length: k.count }, (_, i) => i + 1);
+        sock.write(encodeChannelData(METER_CHANNEL, meterRequest(meterReportId(k.kind), k.meter!.token, indices)));
+      }
+      renew = setInterval(() => {
+        for (const k of kinds) sock.write(encodeChannelData(METER_CHANNEL, meterRenewRequest(meterReportId(k.kind))));
+      }, METER_RENEW_EVERY_MS);
     });
     sock.on("data", () => {
       // Nada a fazer: só pedimos medidores, que chegam por UDP.
@@ -494,14 +492,18 @@ export class WingClient extends EventEmitter<WingEvents> {
   }
 
   private onMeterPacket(buf: Buffer): void {
-    const parsed = parseChannelMeters(buf, CHANNEL_COUNT);
-    if (!parsed || parsed.reportId !== METER_REPORT_ID) return;
+    if (buf.length < 4) return;
+    const kindInfo = STRIP_KINDS[buf.readUInt32BE(0) - 1];
+    if (!kindInfo?.meter) return;
+    const parsed = parseMeterWords(buf, kindInfo.meter.words);
+    if (!parsed) return;
     this.status.lastMeterAt = Date.now();
-    parsed.meters.forEach((m, i) => {
-      const st = this.channels[i];
-      if (st) st.meter = m;
+    const list = this.strips[kindInfo.kind];
+    parsed.strips.forEach((words, i) => {
+      const st = list[i];
+      if (st) st.meter = stripMeterFromWords(words);
     });
-    this.emit("meters", this.channels);
+    this.emit("meters", this.strips);
   }
 
   private setError(msg: string): void {
@@ -518,33 +520,6 @@ export class WingClient extends EventEmitter<WingEvents> {
   }
 }
 
-/** Aplica uma resposta/evento OSC ao estado dos canais. Exportado para testes. */
-export function applyChannelValue(
-  channels: ChannelState[],
-  address: string,
-  value: WingValue,
-  onChange: (st: ChannelState) => void,
-): void {
-  const m = CHANNEL_PATH.exec(address);
-  if (!m) return;
-  const st = channels[Number(m[1]) - 1];
-  if (!st) return;
-  switch (m[2]) {
-    case "name":
-      st.name = value.text;
-      break;
-    case "mute":
-      if (value.kind !== "string") st.mute = value.value === 1;
-      break;
-    case "fdr":
-      if (value.kind === "float") st.faderDb = value.value;
-      break;
-    case "in/set/$g":
-      if (value.kind === "float") st.gainDb = value.value;
-      break;
-  }
-  onChange(st);
-}
 
 /** Resposta ao 'WING?': 'WING,<ip>,<nome>,<modelo>,<serial>,<firmware>'. */
 export function parseDiscoveryReply(text: string) {

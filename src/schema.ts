@@ -162,5 +162,8 @@ export function riskWarning(path: string): string | null {
     return "Entrada física: muda todos os canais que usam essa entrada.";
   }
   if (/^\/(\$ctl|cfg|\$syscfg)(\/|$)/.test(path)) return "Configuração/controle da mesa: pode afetar a mesa inteira.";
+  if (/^\/main\/\d+\/(mute|fdr)$/.test(path)) return "Main: afeta o som do PA inteiro.";
+  if (/^\/dca\/\d+\/(mute|fdr)$/.test(path)) return "DCA: afeta todos os canais atribuídos a ele.";
+  if (/^\/mgrp\/\d+\/mute$/.test(path)) return "Mute group: muta/desmuta vários canais de uma vez.";
   return null;
 }
