@@ -1,0 +1,10 @@
+  name           Bateria               string [16]
+  col            9                   int [1 .. 18]
+  icon           0                   int [0 .. 999]
+  led            1                   int [0 .. 1]
+  mute           0                   int [0 .. 1]
+  fdr            -1.8                fader [-oo .. 10.0 dB], 1024 steps
+  $solo          0                   int [0 .. 1]
+  $sololed       0               r/o int [0 .. 2]
+  mon            A                   list [A, B, A+B]
+

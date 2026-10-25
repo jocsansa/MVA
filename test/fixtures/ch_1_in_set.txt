@@ -1,0 +1,12 @@
+  $mode          M               r/o list [M, ST, M/S]
+  srcauto        0                   int [0 .. 1]
+  altsrc         0                   int [0 .. 1]
+  inv            0                   int [0 .. 1]
+  trim           +5.3                lin [-18.0 .. +18.0 dB], 361 steps
+  bal            0.0                 lin [-9.0 .. +9.0 dB], 181 steps
+  $g             13.0                lin [-2.0 .. 45.5 dB], 20 steps
+  $vph           0                   int [0 .. 1]
+  dlymode        M                   list [M, FT, MS, SMP]
+  dly            0.1                 lin [0.1 .. 150.0 m], 1500 steps
+  dlyon          0                   int [0 .. 1]
+

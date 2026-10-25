@@ -1,0 +1,7 @@
+  on             1                   int [0 .. 1]
+  lvl            -20.8               fader [-oo .. 10.0 dB], 1024 steps
+  pon            1                   int [0 .. 1]
+  mode           PRE                 list [PRE, POST, GRP]
+  plink          0                   int [0 .. 2]
+  pan            0                   lin [-100 .. +100], 201 steps
+

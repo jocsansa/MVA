@@ -1,0 +1,38 @@
+  in             (node)
+  flt            (node)
+  clink          0                   int [0 .. 1]
+  col            18                  int [1 .. 18]
+  name           Vocal1              string [16]
+  icon           101                 int [0 .. 999]
+  led            1                   int [0 .. 1]
+  $col           18              r/o int [1 .. 18]
+  $name          Vocal1          r/o string [16]
+  $icon          101             r/o int [0 .. 999]
+  mute           1                   int [0 .. 1]
+  fdr            -44.6               fader [-oo .. 10.0 dB], 1024 steps
+  pan            -2                  lin [-100 .. +100], 201 steps
+  wid            100                 lin [-150 .. 150 %], 61 steps
+  $solo          0                   int [0 .. 1]
+  $sololed       0               r/o int [0 .. 2]
+  solosafe       0                   int [0 .. 1]
+  mon            A                   list [A, B, A+B]
+  proc           GEDI                list [GEDI, GEID, GIED, IGED, GDEI, GDIE, GIDE, IGDE, EGDI, EGID, EIGD, IEGD, EDGI, EDIG, EIDG, IEDG, DEGI, DEIG, DIEG, IDEG, DGEI, DGIE, DIGE, IDGE]
+  ptap           PFL                 list [IN, FILT, 3, 4, 5, PFL, AFL, POST]
+  $presolo       0                   int [0 .. 1]
+  peq            (node)
+  gate           (node)
+  gatesc         (node)
+  eq             (node)
+  dyn            (node)
+  dynxo          (node)
+  dynsc          (node)
+  preins         (node)
+  main           (node)
+  send           (node)
+  tapwid         100                 lin [-150 .. 150 %], 61 steps
+  postins        (node)
+  tags                               string [80]
+  $fdr           -44.6           r/o fader [-oo .. 10.0 dB], 1024 steps
+  $mute          1               r/o int [0 .. 2]
+  $muteovr       0                   int [0 .. 1]
+

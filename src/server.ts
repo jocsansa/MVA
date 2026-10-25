@@ -12,6 +12,7 @@ import {
   validateFader,
   validateGain,
 } from "./wing.ts";
+import { isSafePath, riskWarning } from "./schema.ts";
 
 const host = process.env.CONSOLE_HOST;
 if (!host) {
@@ -35,6 +36,12 @@ wing.on("channel", (st) => broadcast("channel", st));
 wing.on("status", (s) => broadcast("status", s));
 wing.on("info", (info) => console.log(`Mesa respondeu: ${info}`));
 wing.on("reply", (text) => console.log(`Mesa (/*): ${text}`));
+// Qualquer valor vindo da mesa (GETs e eventos da assinatura /*s) vai para a página.
+// Descrições de nó (texto com várias linhas) não entram nesse fluxo.
+wing.on("osc", (path, value) => {
+  if (value.kind === "string" && value.text.includes("\n")) return;
+  broadcast("param", { path, value });
+});
 
 async function readJson(req: http.IncomingMessage): Promise<unknown> {
   let body = "";
@@ -50,6 +57,17 @@ function sendJson(res: http.ServerResponse, code: number, data: unknown): void {
   res.end(JSON.stringify(data));
 }
 
+/**
+ * Diferença aceita entre o valor pedido e o lido de volta: a mesa arredonda para o passo
+ * mais próximo (ex.: ganho AES50 em passos de 2,5 dB). Para log, meio passo relativo.
+ */
+function paramTolerance(min = 0, max = 0, steps = 0, type = "lin"): number {
+  if (type === "int") return 0;
+  if (!steps || steps < 2) return 0.01;
+  if (type === "log" && min > 0) return max * (Math.pow(max / min, 1 / (steps - 1)) - 1);
+  return (max - min) / (steps - 1) / 2 + 1e-6;
+}
+
 const WRITE_ROUTE = /^\/api\/channels\/(\d+)\/(name|mute|fader|gain)$/;
 const SOURCE_ROUTE = /^\/api\/channels\/(\d+)\/source$/;
 
@@ -60,6 +78,16 @@ async function handleWrite(req: http.IncomingMessage, res: http.ServerResponse, 
   if (!req.headers["content-type"]?.startsWith("application/json") ||
       (origin && origin !== `http://localhost:${port}` && origin !== `http://127.0.0.1:${port}`)) {
     return sendJson(res, 403, { error: "Requisição recusada" });
+  }
+  if (url.pathname === "/api/param") {
+    const body = (await readJson(req)) as { path?: unknown; value?: unknown };
+    if (typeof body.path !== "string" || !isSafePath(body.path)) return sendJson(res, 400, { error: "Caminho inválido" });
+    const { readBack, desc } = await wing.setParam(body.path, body.value);
+    const ok = desc.type === "list" || desc.type === "string"
+      ? readBack.text === body.value
+      : readBack.kind !== "string" && typeof body.value === "number" &&
+        Math.abs(readBack.value - body.value) <= paramTolerance(desc.min, desc.max, desc.steps, desc.type);
+    return sendJson(res, 200, { ok, readBack });
   }
   const m = WRITE_ROUTE.exec(url.pathname);
   if (!m) return sendJson(res, 404, { error: "não encontrado" });
@@ -122,6 +150,28 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === "/") {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     res.end(await readFile(indexPath));
+  } else if (url.pathname === "/api/describe") {
+    // Só leitura: descrição do nó (",s #") com os valores atuais e avisos de risco.
+    const path = url.searchParams.get("path") ?? "/";
+    if (path !== "/" && !isSafePath(path)) return sendJson(res, 400, { error: "Caminho inválido" });
+    try {
+      const children = await wing.describeNode(path);
+      const base = path === "/" ? "" : path;
+      sendJson(res, 200, {
+        path,
+        children: children.map((c) => ({ ...c, path: `${base}/${c.name}`, risk: riskWarning(`${base}/${c.name}`) })),
+      });
+    } catch (e) {
+      sendJson(res, 502, { error: (e as Error).message });
+    }
+  } else if (url.pathname === "/api/param") {
+    const path = url.searchParams.get("path") ?? "";
+    if (!isSafePath(path)) return sendJson(res, 400, { error: "Caminho inválido" });
+    try {
+      sendJson(res, 200, { path, value: await wing.getParam(path) });
+    } catch (e) {
+      sendJson(res, 502, { error: (e as Error).message });
+    }
   } else if (SOURCE_ROUTE.test(url.pathname)) {
     // Só leitura: qual fonte alimenta o canal (para mostrar na confirmação de ganho).
     try {

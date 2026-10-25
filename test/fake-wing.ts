@@ -8,13 +8,29 @@ import { decodeMessage, encodeMessage, type OscArg, type OscMessage } from "../s
 
 const INT_PARAM = /\/(mute|altsrc|in|altin)$/;
 
-export async function fakeWing(initial: Record<string, string | number> = {}) {
+/**
+ * descriptions: texto de "<nó> ,s #" por caminho de nó (formato real da WING).
+ * Consultas "#" são respondidas a partir daí e NÃO contam como escrita.
+ */
+export async function fakeWing(
+  initial: Record<string, string | number> = {},
+  descriptions: Record<string, string> = {},
+) {
   const values = new Map<string, string | number>(Object.entries(initial));
   const writes: OscMessage[] = [];
+  const queries: string[] = [];
   const osc = dgram.createSocket("udp4");
   osc.on("message", (buf, rinfo) => {
     const msg = decodeMessage(buf);
     const a = msg.args[0];
+    if (a?.type === "s" && a.value === "#" && msg.args.length === 1) {
+      queries.push(msg.address);
+      const text = descriptions[msg.address];
+      if (text !== undefined) {
+        osc.send(encodeMessage({ address: msg.address, args: [{ type: "s", value: text }] }), rinfo.port, rinfo.address);
+      }
+      return;
+    }
     if (a) {
       writes.push(msg);
       if (a.type !== "b") values.set(msg.address, a.value);
@@ -40,5 +56,5 @@ export async function fakeWing(initial: Record<string, string | number> = {}) {
   tcp.listen(0, "127.0.0.1");
   await once(tcp, "listening");
   const ports = { osc: osc.address().port, native: (tcp.address() as net.AddressInfo).port };
-  return { ports, writes, values, close: () => (osc.close(), tcp.close()) };
+  return { ports, writes, queries, values, close: () => (osc.close(), tcp.close()) };
 }

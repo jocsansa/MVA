@@ -1,0 +1,10 @@
+  lc             1                   int [0 .. 1]
+  lcf            120.0               log [20.0 .. 2k00 Hz], 641 steps
+  lcs            24                  list [6, 12, 18, 24]
+  hc             0                   int [0 .. 1]
+  hcf            10k02               log [50.0 .. 20k00 Hz], 833 steps
+  hcs            12                  list [6, 12]
+  tf             0                   int [0 .. 1]
+  mdl            TILT                list [TILT, MAX, AP1, AP2]
+  tilt           0.00                lin [-6.00 .. +6.00 dB], 49 steps
+

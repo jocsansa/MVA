@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { encodeMessage } from "../src/osc.ts";
 import {
   WingClient,
@@ -48,8 +49,12 @@ test("validação de ganho", () => {
   assert.match(validateGain(-4)!, /-3/);
 });
 
+// Descrição real de uma entrada AES50 (fixture capturada da mesa): g vai de -2.0 a 45.5 dB.
+const IO_IN_DESC = readFileSync(new URL("./fixtures/io_in_A_1.txt", import.meta.url), "utf8");
+const IO_DESCRIPTIONS = { "/io/in/LCL/5": IO_IN_DESC, "/io/in/A/12": IO_IN_DESC, "/io/in/A/5": IO_IN_DESC };
+
 async function withClient(initial: Record<string, string | number>, fn: (c: WingClient, fake: Awaited<ReturnType<typeof fakeWing>>) => Promise<void>) {
-  const fake = await fakeWing(initial);
+  const fake = await fakeWing(initial, IO_DESCRIPTIONS);
   const client = new WingClient("127.0.0.1", { ports: fake.ports, allowWrites: true });
   client.on("status", () => {});
   const log = console.log;

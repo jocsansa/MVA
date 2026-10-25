@@ -9,6 +9,14 @@ import net from "node:net";
 import { EventEmitter } from "node:events";
 import { decodeMessage, encodeMessage, parseWingValue, type OscMessage, type WingValue } from "./osc.ts";
 import {
+  encodeParamValue,
+  isSafePath,
+  parseNodeDescription,
+  splitPath,
+  type NodeChild,
+  type ParamDesc,
+} from "./schema.ts";
+import {
   METER_CHANNEL,
   encodeChannelData,
   meterChannelsRequest,
@@ -285,6 +293,13 @@ export class WingClient extends EventEmitter<WingEvents> {
         `Fonte não confere: ${src.gainAddress} = ${sourceGain} dB, mas o canal ${ch} mostra ${mirror} dB. Nada foi enviado.`,
       );
     }
+    // Faixa real da fonte segundo a própria mesa (ex.: AES50 vai de -2.0 a 45.5 dB).
+    const { parent, name } = splitPath(src.gainAddress);
+    const gDesc = (await this.describeNode(parent)).find((c) => c.name === name);
+    if (gDesc?.kind === "param") {
+      const check = encodeParamValue(gDesc, db);
+      if ("error" in check) throw new Error(check.error);
+    }
     this.write(gainMessage(src, db));
     await new Promise((r) => setTimeout(r, 100));
     const readBack = await this.readNumber(src.gainAddress);
@@ -296,6 +311,55 @@ export class WingClient extends EventEmitter<WingEvents> {
     const v = await this.readValue(address);
     if (v.kind === "string") throw new Error(`Resposta inesperada em ${address}: ${v.text}`);
     return v.value;
+  }
+
+  /**
+   * Consulta de descrição de nó ("<nó> ,s #"): só leitura, segundo a documentação.
+   * É a única mensagem com argumento que não passa por write(); o argumento é fixo.
+   */
+  async describeNode(path: string, timeoutMs = 2000): Promise<NodeChild[]> {
+    if (!isSafePath(path) && path !== "/") throw new Error(`Caminho inválido: ${path}`);
+    if (this.closed) throw new Error("Cliente fechado");
+    const text = await new Promise<string>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.off("osc", onOsc);
+        reject(new Error(`Sem resposta à descrição de ${path}`));
+      }, timeoutMs);
+      const onOsc = (addr: string, value: WingValue) => {
+        // A resposta vem no mesmo endereço, como uma string com uma linha por filho.
+        if (addr !== path || value.kind !== "string" || !value.text.includes("\n")) return;
+        clearTimeout(timer);
+        this.off("osc", onOsc);
+        resolve(value.text);
+      };
+      this.on("osc", onOsc);
+      this.osc.send(encodeMessage({ address: path, args: [{ type: "s", value: "#" }] }), this.ports.osc, this.host);
+    });
+    return parseNodeDescription(text);
+  }
+
+  /** Lê um parâmetro qualquer (GET). */
+  async getParam(path: string): Promise<WingValue> {
+    if (!isSafePath(path)) throw new Error(`Caminho inválido: ${path}`);
+    return this.readValue(path);
+  }
+
+  /**
+   * Escreve um parâmetro qualquer. Antes, consulta a descrição atual do nó pai na mesa
+   * (tipo, faixa, opções, somente leitura) e recusa o que não couber. Depois lê de volta.
+   */
+  async setParam(path: string, value: unknown): Promise<{ readBack: WingValue; desc: ParamDesc }> {
+    this.assertWritable();
+    if (!isSafePath(path)) throw new Error(`Caminho inválido: ${path}`);
+    const { parent, name } = splitPath(path);
+    const child = (await this.describeNode(parent)).find((c) => c.name === name);
+    if (!child) throw new Error(`Parâmetro não existe na mesa: ${path}`);
+    if (child.kind !== "param") throw new Error(`${path} é um nó, não um parâmetro`);
+    const encoded = encodeParamValue(child, value);
+    if ("error" in encoded) throw new Error(encoded.error);
+    this.write({ address: path, args: [encoded.arg] });
+    await new Promise((r) => setTimeout(r, 100));
+    return { readBack: await this.readValue(path), desc: child };
   }
 
   private readValue(address: string, timeoutMs = 1500): Promise<WingValue> {

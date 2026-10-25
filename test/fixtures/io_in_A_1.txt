@@ -1,0 +1,16 @@
+  mode           M                   list [M, ST, M/S]
+  g              13.0                lin [-2.0 .. 45.5 dB], 20 steps
+  vph            0                   int [0 .. 1]
+  mute           0                   int [0 .. 1]
+  pol            0                   int [0 .. 1]
+  col            1                   int [1 .. 18]
+  name                               string [16]
+  icon           0                   int [0 .. 999]
+  tags                               string [80]
+  $ha            2               r/o int [0 .. 4]
+  rmt            OFF                 list [OFF, AES A, AES B, AES C]
+  $ract          0               r/o int [0 .. 1]
+  $rdest         IN 1            r/o string [7]
+  rcvc           0                   int [0 .. 1]
+  $mute          0               r/o int [0 .. 2]
+
