@@ -393,8 +393,19 @@ export class WingClient extends EventEmitter<WingEvents> {
    * Escreve um parâmetro qualquer. Antes, consulta a descrição atual do nó pai na mesa
    * (tipo, faixa, opções, somente leitura) e recusa o que não couber. Depois lê de volta.
    */
-  async setParam(path: string, value: unknown): Promise<{ readBack: WingValue; desc: ParamDesc }> {
+  async setParam(path: string, value: unknown): Promise<{ readBack: WingValue; desc: ParamDesc; message: OscMessage }> {
     this.assertWritable();
+    const { message, desc } = await this.previewParam(path, value);
+    this.write(message);
+    await new Promise((r) => setTimeout(r, 100));
+    return { readBack: await this.readValue(path), desc, message };
+  }
+
+  /**
+   * Valida uma escrita contra a descrição atual do nó pai, SEM escrever: devolve a
+   * mensagem exata que setParam enviaria. Só faz a consulta de descrição (leitura).
+   */
+  async previewParam(path: string, value: unknown): Promise<{ message: OscMessage; desc: ParamDesc }> {
     if (!isSafePath(path)) throw new Error(`Caminho inválido: ${path}`);
     const { parent, name } = splitPath(path);
     const child = (await this.describeNode(parent)).find((c) => c.name === name);
@@ -402,9 +413,7 @@ export class WingClient extends EventEmitter<WingEvents> {
     if (child.kind !== "param") throw new Error(`${path} é um nó, não um parâmetro`);
     const encoded = encodeParamValue(child, value);
     if ("error" in encoded) throw new Error(encoded.error);
-    this.write({ address: path, args: [encoded.arg] });
-    await new Promise((r) => setTimeout(r, 100));
-    return { readBack: await this.readValue(path), desc: child };
+    return { message: { address: path, args: [encoded.arg] }, desc: child };
   }
 
   /** GETs aguardando resposta, por endereço (resolvidos em onOsc). */

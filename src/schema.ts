@@ -5,7 +5,7 @@
 //   "  eq             (node)"
 // Com "?" vem o mesmo sem a coluna de valor.
 
-import type { OscArg } from "./osc.ts";
+import type { OscArg, WingValue } from "./osc.ts";
 
 export type ParamType = "int" | "lin" | "log" | "fader" | "list" | "string";
 
@@ -92,7 +92,8 @@ export function parseDescriptionLine(line: string, withValues: boolean): NodeChi
 
 export function parseNodeDescription(text: string, withValues = true): NodeChild[] {
   const out: NodeChild[] = [];
-  for (const line of text.split("\n")) {
+  // Aceita CRLF: no Windows o git pode converter as fixtures capturadas da mesa.
+  for (const line of text.split(/\r?\n/)) {
     const child = parseDescriptionLine(line, withValues);
     if (child) out.push(child);
   }
@@ -136,6 +137,23 @@ export function encodeParamValue(desc: ParamDesc, value: unknown): { arg: OscArg
   }
 }
 
+/**
+ * Confere o valor lido de volta com o pedido. A mesa arredonda para o passo mais próximo
+ * (ex.: ganho AES50 em passos de 2,5 dB); em log o passo é relativo ao valor.
+ */
+export function readBackMatches(desc: ParamDesc, sent: unknown, readBack: WingValue): boolean {
+  if (desc.type === "list" || desc.type === "string") return readBack.text === sent;
+  if (readBack.kind === "string" || typeof sent !== "number") return false;
+  const diff = Math.abs(readBack.value - sent);
+  if (desc.type === "int") return diff === 0;
+  // Fader: 1024 passos não lineares em dB (mais finos perto de 0 dB).
+  if (desc.type === "fader") return sent <= -144 ? readBack.value <= -144 : diff <= 0.5;
+  const { min = 0, max = 0, steps = 0 } = desc;
+  if (!steps || steps < 2) return diff <= 0.01;
+  if (desc.type === "log" && min > 0) return diff <= Math.abs(sent) * (Math.pow(max / min, 1 / (steps - 1)) - 1) + 1e-6;
+  return diff <= (max - min) / (steps - 1) / 2 + 1e-6;
+}
+
 /** Caminho OSC aceito pela API genérica: sem curingas e sem os prefixos especiais /% e /*. */
 export function isSafePath(path: string): boolean {
   return /^\/[A-Za-z0-9$_.+-]+(\/[A-Za-z0-9$_.+-]+)*$/.test(path);
@@ -168,6 +186,11 @@ export function riskWarning(path: string): string | null {
   if (/\/send\/MX\d+\/(on|lvl|mode|pre|pan|pon|plink)$/.test(path)) {
     return "Envio para matriz: muda o que sai nessa matriz (PA, fills, transmissão).";
   }
+  if (/\/flt\/(lc|lcf|lcs)$/.test(path)) {
+    return "Filtro passa-alta: desligar ou baixar a frequência deixa passar grave (ronco, microfonia, pancada no PA).";
+  }
+  if (/\/eq\/(on|mdl)$/.test(path)) return "Liga/desliga ou troca o EQ inteiro do canal: o timbre muda de uma vez.";
+  if (/\/eq\/[lh1-4]g$/.test(path)) return "Ganho de EQ: reforço alto pode causar microfonia.";
   if (/^\/main\/\d+\/(mute|fdr)$/.test(path)) return "Main: afeta o som do PA inteiro.";
   if (/^\/dca\/\d+\/(mute|fdr)$/.test(path)) return "DCA: afeta todos os canais atribuídos a ele.";
   if (/^\/mgrp\/\d+\/mute$/.test(path)) return "Mute group: muta/desmuta vários canais de uma vez.";

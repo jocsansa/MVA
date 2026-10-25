@@ -115,6 +115,61 @@ Medidores: uma coleção só com todos os tipos (tokens `0xa0`..`0xa5`; na WING 
 novo substitui o anterior na mesma conexão), 8 valores por
 strip e 4 no DCA; a página mostra a saída (L/R).
 
+### EQ e filtro dos canais
+
+Aba **EQ** (ou botão EQ no card do canal; link direto `http://localhost:3000/#eq/5`). PEQ de
+6 bandas (LOW, 1–4, HIGH; LOW e HIGH podem ser PEQ ou shelf) e filtros passa-alta e
+passa-baixa. Soltar um ponto arrastado na curva, tocar em −/+, digitar ou escolher uma
+opção envia na hora, sem etapa de confirmação (veja abaixo). Cada comando é validado na
+descrição da mesa, enviado um por vez e lido de volta; o envio para no primeiro problema.
+A barra no rodapé mostra os comandos exatos enviados, a confirmação da leitura de volta e
+os avisos de risco; o aviso do passa-alta fica sempre visível no painel. O painel edita só
+o EQ modelo STD (outros modelos têm outros parâmetros).
+
+**Confirmação removida (temporário):** a etapa de confirmação antes de enviar foi removida
+do painel de EQ e do fluxo por chat a pedido do usuário, enquanto ele não está usando a
+mesa ao vivo. Validação, avisos de risco, leitura de volta e o padrão somente leitura
+(escrita só com `WING_ALLOW_WRITES=1`) continuam. Para uso ao vivo, a confirmação pode
+ser recolocada: a rota já tem o `dryRun`, que devolve o comando exato sem escrever. Os
+outros controles da página (nome, mute, fader, pan, cor, ganho) continuam pedindo
+confirmação.
+
+| Rota | O que faz |
+|---|---|
+| `GET /api/channels/N/eq` | EQ (`eq`) e filtro (`flt`) do canal: valor, faixa, opções e risco de cada parâmetro (2 consultas de descrição, só leitura) |
+| `POST /api/channels/N/eq` `{param, value}` | Escreve um parâmetro do EQ: `on`, `lg lf lq leq`, `1g`…`4q`, `hg hf hq heq` |
+| `POST /api/channels/N/flt` `{param, value}` | Escreve um parâmetro do filtro: `lc lcf lcs` (passa-alta), `hc hcf hcs` (passa-baixa) |
+| … com `"dryRun": true` | Só valida na descrição da mesa e devolve o comando exato; nada é escrito |
+
+| Parâmetro | Tipo e faixa (fw 3.1) |
+|---|---|
+| `on`, `lc`, `hc` | `,i` 0 ou 1 |
+| `lg`, `1g`…`4g`, `hg` | `,f` -15 a +15 dB |
+| `lf`, `1f`…`4f`, `hf` | `,f` 20 a 20000 Hz |
+| `lq`, `1q`…`4q`, `hq` | `,f` 0.44 a 10 |
+| `leq`, `heq` | `,s` `PEQ` ou `SHV` (shelf) |
+| `lcf` / `hcf` | `,f` 20 a 2000 Hz / 50 a 20000 Hz |
+| `lcs` / `hcs` | `,s` `"6"`, `"12"`, `"18"`, `"24"` / `"6"`, `"12"` (dB/oitava) |
+
+A resposta da escrita traz `ok` (leitura de volta confere, dentro de um passo da mesa),
+`command`, `risk` e `readBack`. Avisos: desligar o EQ, mexer no passa-alta e ganhos de EQ.
+
+### Comandar pelo chat (Claude Code)
+
+As rotas acima são HTTP local, então o Claude Code pode operar a mesa a pedido no chat.
+O Claude lê (`GET /api/channels/N/eq`), mostra o comando OSC exato e o aviso de risco
+(com `dryRun`) e envia, uma escrita por vez, informando a leitura de volta. Não há etapa
+separada de confirmação (removida a pedido do usuário enquanto não está ao vivo): o "sim"
+do usuário para prosseguir já cobre o envio.
+
+```
+curl -s http://localhost:3000/api/channels/5/eq
+curl -s -H "content-type: application/json" -d '{"param":"1g","value":-3,"dryRun":true}' http://localhost:3000/api/channels/5/eq
+curl -s -H "content-type: application/json" -d '{"param":"1g","value":-3}' http://localhost:3000/api/channels/5/eq
+```
+
+A rota recusa pedidos com `Origin` de outro site e sem `content-type: application/json`.
+
 ### Ganho: cuidados
 
 O ganho fica no headamp da **fonte**, não no canal. O app lê a fonte em

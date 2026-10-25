@@ -78,6 +78,101 @@
   #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); max-width:calc(100vw - 32px); padding:8px 14px;
     border-radius:6px; background:var(--panel); border:1px solid var(--line); display:none; z-index:11; }
   #toast.show { display:block; }
+  #dlg .cmd { white-space:pre-wrap; }
+  .eq-tag { flex:0 0 32px; cursor:pointer; }
+  .eq-tag:hover { border-color:var(--text); color:var(--text); }
+
+  /* ---------- painel de EQ: escuro de alto contraste, cor da WING como identidade do canal,
+     alvos de toque grandes (48px ou mais) ---------- */
+  #eq { --ink:#fff; --ink2:#c8ced6; --bg0:#000; --bg1:#0c0e11; --bg2:#181b20; --edge:#4a525e; --go:#ffd400;
+    --cc:#6b7c93; --cc-ink:#fff; padding:12px 16px 104px; color:var(--ink); color-scheme:dark; }
+  #eq[hidden], #grid[hidden] { display:none; }
+  body.eq-mode { background:#000; }
+  .big { min-height:48px; min-width:48px; padding:0 16px; font:inherit; font-size:16px; font-weight:700; color:var(--ink);
+    background:var(--bg2); border:2px solid var(--edge); border-radius:10px; cursor:pointer; touch-action:manipulation; }
+  .big:disabled { opacity:.4; cursor:default; }
+  .big:focus-visible { outline:3px solid var(--go); outline-offset:2px; }
+  .big.ghost { background:transparent; }
+  .big.toggle.on { background:var(--cc); border-color:var(--cc); color:var(--cc-ink); }
+  .eq-chips { display:flex; gap:8px; overflow-x:auto; padding-bottom:8px; }
+  .chip { flex:0 0 auto; position:relative; min-width:84px; min-height:56px; padding:6px 10px 6px 16px; text-align:left;
+    font-size:14px; line-height:1.2; }
+  .chip::before { content:""; position:absolute; left:0; top:0; bottom:0; width:7px; background:var(--chip); border-radius:8px 0 0 8px; }
+  .chip b { display:block; font-size:12px; color:var(--ink2); }
+  .chip span { display:block; max-width:9em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chip.sel { background:var(--chip); border-color:#fff; color:var(--chip-ink); }
+  .chip.sel b { color:inherit; }
+  .eq-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:8px 0 12px;
+    padding:10px 14px; background:var(--bg1); border:2px solid var(--edge); border-left:12px solid var(--cc); border-radius:12px; }
+  .eq-id { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; min-width:0; }
+  .eq-chnum { font-size:22px; font-weight:800; }
+  .eq-chname { font-size:22px; font-weight:600; color:var(--ink2); overflow-wrap:anywhere; }
+  .eq-model { font-size:12px; font-weight:700; padding:2px 8px; border:1px solid var(--edge); border-radius:6px; color:var(--ink2); }
+  .eq-model:empty { display:none; }
+  .eq-headbtns { display:flex; gap:8px; }
+  .eq-msg { margin:0 0 12px; padding:10px 14px; border:2px solid var(--go); border-radius:10px; color:var(--go); font-weight:600; }
+  .eq-msg:empty { display:none; }
+  .eq-msg.err { border-color:var(--red); color:#ff7b72; }
+  .eq-graph-wrap { background:var(--bg0); border:2px solid var(--edge); border-radius:12px; overflow:hidden; }
+  #eq-graph { display:block; touch-action:none; user-select:none; -webkit-user-select:none; }
+  #eq-graph .g { stroke:#1c2026; stroke-width:1; }
+  #eq-graph .g-major { stroke:#343c47; }
+  #eq-graph .gl { fill:#9aa3ad; font-size:11px; }
+  #eq-graph .c-fill { fill-opacity:.28; }
+  #eq-graph .c-main { fill:none; stroke:#fff; stroke-width:3; }
+  #eq-graph .c-old { fill:none; stroke:#9aa3ad; stroke-width:2; stroke-dasharray:6 5; }
+  #eq-graph .c-band { fill:none; stroke-width:2; }
+  #eq-graph .h circle { stroke:#000; stroke-width:2; }
+  #eq-graph .h .ring { fill:none; stroke:#fff; stroke-width:3; }
+  #eq-graph .h.dim { opacity:.45; }
+  #eq-graph text.hl { font-size:13px; font-weight:800; text-anchor:middle; fill:#000; pointer-events:none; }
+  #eq-graph .h-flt rect { fill:#fff; stroke:#000; stroke-width:2; }
+  #eq-graph .h-flt.off rect { fill:#000; stroke:#9aa3ad; }
+  #eq-graph .h-flt.off text.hl { fill:#9aa3ad; }
+  .eq-bands { display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); gap:8px; margin:12px 0; }
+  .band { position:relative; min-height:64px; padding:6px 4px; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:2px; border-top:7px solid var(--bc); }
+  .band small { font-size:12px; font-weight:600; color:var(--ink2); white-space:nowrap; }
+  .band.sel { background:var(--bc); border-color:var(--bc); color:#000; }
+  .band.sel small { color:#000; }
+  .band.changed::after, .eq-card h3.changed::after { content:""; position:absolute; top:6px; right:6px; width:10px; height:10px;
+    border-radius:50%; background:var(--go); box-shadow:0 0 0 2px #000; }
+  .eq-lower { display:grid; grid-template-columns:repeat(auto-fit, minmax(270px, 1fr)); gap:12px; }
+  .eq-card { background:var(--bg1); border:2px solid var(--edge); border-radius:12px; padding:12px; display:flex;
+    flex-direction:column; gap:10px; }
+  .eq-card h3 { position:relative; margin:0; min-height:48px; font-size:17px; display:flex; align-items:center;
+    justify-content:space-between; gap:8px; padding-right:16px; }
+  .eq-card.band-card { border-top:7px solid var(--bc); }
+  .stp { display:grid; grid-template-columns:5.2em 52px minmax(0, 1fr) 52px; gap:6px; align-items:center; }
+  .stp-l { font-weight:600; color:var(--ink2); }
+  .stp .big { padding:0; font-size:22px; }
+  .stp-v { min-width:0; min-height:52px; text-align:center; font:inherit; font-size:18px; font-weight:700; color:var(--ink);
+    background:var(--bg0); border:2px solid var(--edge); border-radius:10px; }
+  .stp-v:focus { outline:none; border-color:var(--go); }
+  .stp-v:read-only { color:var(--ink2); }
+  .stp.changed .stp-v, .seg.changed .big.on { border-color:var(--go); box-shadow:0 0 0 2px var(--go); }
+  .seg { display:flex; gap:6px; }
+  .seg .big { flex:1; padding:0 8px; }
+  .seg .big.on { background:#fff; border-color:#fff; color:#000; }
+  .eq-risk { margin:0; color:var(--go); font-size:14px; font-weight:600; }
+  .eq-risk:empty { display:none; }
+  .eq-status { position:fixed; left:0; right:0; bottom:0; display:none; flex-direction:column; gap:4px; padding:10px 16px;
+    background:#000; border-top:3px solid var(--go); z-index:5; }
+  .eq-status.show { display:flex; }
+  .eq-status.ok { border-top-color:var(--green); }
+  .eq-status.err { border-top-color:var(--red); }
+  .eq-status-main { font-weight:700; }
+  .eq-status.err .eq-status-main { color:#ff7b72; }
+  .eq-status-cmd { font-family:ui-monospace, Menlo, monospace; font-size:13px; color:var(--ink2); white-space:pre-wrap;
+    overflow-wrap:anywhere; }
+  .eq-status-risk { color:var(--go); font-size:14px; font-weight:600; }
+  .eq-status-cmd:empty, .eq-status-risk:empty { display:none; }
+  @media (max-width:560px) {
+    .eq-bands { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+    .stp { grid-template-columns:5.6em 48px minmax(0, 1fr) 48px; }
+    .stp-l { font-size:14px; }
+    .eq-chnum, .eq-chname { font-size:18px; }
+  }
 </style>
 </head>
 <body>
@@ -93,6 +188,30 @@
   <code>CONSOLE_HOST=&lt;ip&gt; WING_ALLOW_WRITES=1 npm start</code></div>
 <nav id="tabs"></nav>
 <div id="grid"></div>
+<section id="eq" hidden aria-label="EQ do canal">
+  <div class="eq-chips" id="eq-chips" aria-label="Escolher canal"></div>
+  <div class="eq-head">
+    <div class="eq-id"><span class="eq-chnum" id="eq-chnum"></span><span class="eq-chname" id="eq-chname"></span>
+      <span class="eq-model" id="eq-model"></span></div>
+    <div class="eq-headbtns">
+      <button type="button" class="big toggle" id="eq-on">EQ</button>
+      <button type="button" class="big ghost" id="eq-reload" title="Ler de novo da mesa">Reler</button>
+    </div>
+  </div>
+  <div class="eq-msg" id="eq-msg"></div>
+  <div class="eq-graph-wrap" id="eq-graph-wrap"><svg id="eq-graph" role="img" aria-label="Curva de EQ e filtros"></svg></div>
+  <div class="eq-bands" id="eq-bands"></div>
+  <div class="eq-lower">
+    <div class="eq-card band-card" id="eq-band-card"></div>
+    <div class="eq-card" id="eq-hpf"></div>
+    <div class="eq-card" id="eq-lpf"></div>
+  </div>
+  <div class="eq-status" id="eq-status" role="status" aria-live="polite">
+    <div class="eq-status-main" id="eq-status-main"></div>
+    <div class="eq-status-cmd" id="eq-status-cmd"></div>
+    <div class="eq-status-risk" id="eq-status-risk"></div>
+  </div>
+</section>
 <div id="dlg" role="dialog" aria-modal="true">
   <div class="box">
     <h2 id="dlg-title"></h2>
@@ -389,7 +508,8 @@
       <input class="name" maxlength="16" placeholder="(sem nome)" spellcheck="false" autocomplete="off" readonly>
       ${k.meter ? '<div class="meter"><div class="bar"></div><div class="bar"></div></div>' : ""}
       <div class="btns"><button type="button" class="tag mute-tag" disabled></button>
-        ${has(st.kind, "$solo") ? '<button type="button" class="tag solo-tag" disabled title="Solo">S</button>' : ""}</div>
+        ${has(st.kind, "$solo") ? '<button type="button" class="tag solo-tag" disabled title="Solo">S</button>' : ""}
+        ${st.kind === "ch" ? '<button type="button" class="tag eq-tag" title="Abrir o EQ do canal">EQ</button>' : ""}</div>
       ${has(st.kind, "fdr") ? '<label class="row"><span>Fader</span><span class="val"><input class="num-in fdr" readonly autocomplete="off"> dB</span></label>' : ""}
       ${has(st.kind, "pan") ? '<label class="row"><span>Pan</span><span class="val"><input class="num-in pan" readonly autocomplete="off"></span></label>' : ""}
       ${has(st.kind, "in/set/$g") ? '<label class="row"><span>Ganho</span><span class="val"><input class="num-in gain" readonly autocomplete="off"> dB</span></label>' : ""}`;
@@ -403,6 +523,8 @@
     c.mute.addEventListener("click", () => toggle(cur(), "mute", "mute", ["Mutar", "Desmutar", "mutado", "desmutado"]));
     if (c.solo) c.solo.addEventListener("click", () => toggle(cur(), "solo", "$solo", ["Ligar solo de", "Desligar solo de", "solo ligado", "solo desligado"]));
     if (c.colbar) c.colbar.addEventListener("click", () => editColor(cur()));
+    const eqBtn = el.querySelector(".eq-tag");
+    if (eqBtn) eqBtn.addEventListener("click", () => openEq(st.index));
     if (c.fdr) { c.fdr.value = "—"; bindEditable(c.fdr, () => fmtNum(cur().faderDb), (t) => editFader(cur(), c, t)); }
     if (c.pan) { c.pan.value = "—"; bindEditable(c.pan, () => fmtPan(cur().pan), (t) => editPan(cur(), c, t)); }
     if (c.gain) { c.gain.value = "—"; bindEditable(c.gain, () => fmtNum(cur().gainDb), (t) => editGain(cur(), c, t)); }
@@ -412,6 +534,7 @@
 
   function render(st) {
     strips[st.kind][st.index - 1] = st;
+    if (st.kind === "ch") updateChip(st);
     if (st.kind !== active) return;
     const c = card(st);
     if (!c.name.dataset.editing && c.name.value !== st.name && document.activeElement !== c.name) c.name.value = st.name;
@@ -442,10 +565,15 @@
   }
 
   function showTab(kind) {
-    if (!info(kind)) kind = "ch";
+    if (kind !== "eq" && !info(kind)) kind = "ch";
     active = kind;
     try { localStorage.setItem("wing-tab", kind); } catch {}
     document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.kind === kind));
+    const isEq = kind === "eq";
+    grid.hidden = isEq;
+    eqPanel.hidden = !isEq;
+    document.body.classList.toggle("eq-mode", isEq);
+    if (isEq) return showEq();
     grid.replaceChildren();
     for (const st of strips[kind]) grid.appendChild(card(st).el);
     for (const st of strips[kind]) render(st);
@@ -462,6 +590,559 @@
       b.addEventListener("click", () => showTab(k.kind));
       nav.appendChild(b);
     }
+    const eqTab = document.createElement("button");
+    eqTab.type = "button";
+    eqTab.dataset.kind = "eq";
+    eqTab.textContent = "EQ";
+    eqTab.addEventListener("click", () => showTab("eq"));
+    nav.appendChild(eqTab);
+  }
+
+  // ---------- painel de EQ ----------
+  // Sem etapa de confirmação (pedido do usuário enquanto não está ao vivo): ao soltar o ponto
+  // arrastado, tocar em −/+, digitar ou escolher uma opção, o valor fica PENDENTE (curva branca;
+  // a tracejada é o que está na mesa) e é enviado na hora. A rota valida cada comando na
+  // descrição da mesa e lê de volta; a barra de status mostra o comando exato e os avisos.
+  const BANDS = [
+    { id: "l", label: "LOW", short: "L", shape: "leq" }, { id: "1", label: "1", short: "1" },
+    { id: "2", label: "2", short: "2" }, { id: "3", label: "3", short: "3" },
+    { id: "4", label: "4", short: "4" }, { id: "h", label: "HIGH", short: "H", shape: "heq" },
+  ];
+  const BAND_COLORS = { l: "#ff6b5e", 1: "#ffb02e", 2: "#f2e94e", 3: "#4be37a", 4: "#3ec8ff", h: "#d08bff" };
+  const DB_RANGE = 18; // a escala vai de -18 a +18 dB (ganho das bandas: ±15)
+  const eqPanel = document.getElementById("eq");
+  const svg = document.getElementById("eq-graph");
+  let curveLib = null;
+  let eqCh = 1;
+  try { eqCh = Number(localStorage.getItem("wing-eq-ch")) || 1; } catch {}
+  // Link direto: http://localhost:3000/#eq/5 abre o EQ do CH 5.
+  const eqHash = /^#eq(?:\/(\d+))?$/.exec(location.hash);
+  if (eqHash) {
+    active = "eq";
+    if (eqHash[1] && Number(eqHash[1]) >= 1 && Number(eqHash[1]) <= 40) eqCh = Number(eqHash[1]);
+  }
+  let eqData = null; // GET /api/channels/N/eq
+  let eqError = null;
+  let eqLoadToken = 0;
+  let selBand = "1";
+  const pending = new Map(); // "eq/1g" -> valor
+  let G = { w: 800, h: 340 };
+  let handles = [];
+  let drag = null;
+
+  import("/eq-curve.js").then((m) => { curveLib = m; renderEq(); }, () => { eqError = "Não foi possível carregar /eq-curve.js"; renderEq(); });
+
+  const fmtHz = (f) => f >= 1000 ? (f / 1000).toFixed(f >= 10000 ? 1 : 2) + "k" : f.toFixed(f < 100 ? 1 : 0);
+  const fmtGain = (g) => (g > 0 ? "+" : "") + g.toFixed(1);
+  const fmtQ = (q) => q.toFixed(2);
+  // "1k2", "1.2k", "1200", "1200 Hz" -> 1200
+  function parseHz(text) {
+    const t = text.trim().toLowerCase().replace(",", ".").replace(/\s*hz$/, "");
+    let m = /^(\d+)k(\d*)$/.exec(t);
+    if (m) return Number(m[1] + "." + (m[2] || "0")) * 1000;
+    m = /^(\d+(?:\.\d+)?)k$/.exec(t);
+    if (m) return Number(m[1]) * 1000;
+    return /^\d+(\.\d+)?$/.test(t) ? Number(t) : NaN;
+  }
+  const parseNum = (text) => { const t = text.trim().replace(",", ".").replace(/\s*db$/i, ""); return /^[+-]?\d+(\.\d+)?$/.test(t) ? Number(t) : NaN; };
+  const inkOn = (hex) => { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) > 150 ? "#000" : "#fff"; };
+  const chColor = (st) => st && st.col ? COLORS[st.col - 1] : "#6b7c93";
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+  const eqDesc = (sec, p) => eqData && eqData[sec][p];
+  const eqCur = (sec, p) => { const d = eqDesc(sec, p); return d ? d.value : null; };
+  const eqVal = (sec, p) => pending.has(`${sec}/${p}`) ? pending.get(`${sec}/${p}`) : eqCur(sec, p);
+  const isChanged = (sec, p) => pending.has(`${sec}/${p}`);
+  const canEditEq = () => writable() && !!eqData && eqData.editable && !!curveLib;
+
+  function sameValue(d, a, b) {
+    if (typeof a !== "number" || typeof b !== "number") return a === b;
+    return d.type === "log" ? Math.abs(a / b - 1) < 0.001 : Math.abs(a - b) < 0.005;
+  }
+
+  /** Muda o valor pendente (limitado e arredondado ao passo da faixa que a mesa descreveu). */
+  function setPending(sec, p, v) {
+    const d = eqDesc(sec, p);
+    if (!d || !canEditEq() || v == null || (typeof v === "number" && !Number.isFinite(v))) return;
+    if (typeof v === "number" && (d.type === "lin" || d.type === "log")) {
+      const q = curveLib.quantize(v, d);
+      v = d.type === "log" ? Number(q.toPrecision(5)) : Math.round(q * 100) / 100;
+    }
+    const k = `${sec}/${p}`;
+    if (sameValue(d, v, d.value)) pending.delete(k);
+    else pending.set(k, v);
+  }
+
+  function curveModel(get) {
+    const num = (sec, p) => { const v = get(sec, p); return typeof v === "number" ? v : null; };
+    const bands = [];
+    for (const b of BANDS) {
+      const f = num("eq", b.id + "f"), g = num("eq", b.id + "g"), q = num("eq", b.id + "q");
+      if (f == null || g == null || q == null) continue;
+      const shape = b.shape && get("eq", b.shape) === "SHV" ? (b.id === "l" ? "low" : "high") : "peq";
+      bands.push({ id: b.id, shape, f, g, q });
+    }
+    const cut = (on, f, s) => num("flt", f) == null ? null : { on: num("flt", on) === 1, f: num("flt", f), slope: Number(get("flt", s)) || 12 };
+    return { eqOn: num("eq", "on") === 1, bands, lc: cut("lc", "lcf", "lcs"), hc: cut("hc", "hcf", "hcs") };
+  }
+
+  // ---- curva (SVG em pixels: o viewBox acompanha a largura) ----
+  const fx = (f) => (Math.log(f / 20) / Math.log(1000)) * G.w;
+  const xf = (x) => 20 * Math.pow(1000, clamp(x, 0, G.w) / G.w);
+  const dy = (db) => G.h / 2 - (db / DB_RANGE) * (G.h / 2 - 14);
+  const yd = (y) => ((G.h / 2 - y) / (G.h / 2 - 14)) * DB_RANGE;
+
+  function drawEq() {
+    if (eqPanel.hidden) return;
+    const w = Math.max(280, Math.round(document.getElementById("eq-graph-wrap").clientWidth - 4));
+    G = { w, h: Math.round(clamp(w * 0.42, 240, 420)) };
+    const h = G.h;
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    svg.setAttribute("width", w);
+    svg.setAttribute("height", h);
+    let s = "";
+    for (const f of [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]) {
+      const x = fx(f);
+      s += `<line class="g${[100, 1000, 10000].includes(f) ? " g-major" : ""}" x1="${x}" x2="${x}" y1="0" y2="${h}"/>`;
+      if (f > 20 && f < 20000) s += `<text class="gl" x="${x + 3}" y="${h - 6}">${f >= 1000 ? f / 1000 + "k" : f}</text>`;
+    }
+    for (const db of [-12, -6, 0, 6, 12]) {
+      const y = dy(db);
+      s += `<line class="g${db === 0 ? " g-major" : ""}" x1="0" x2="${w}" y1="${y}" y2="${y}"/>`;
+      s += `<text class="gl" x="4" y="${y - 4}">${db > 0 ? "+" + db : db}</text>`;
+    }
+    handles = [];
+    if (!eqData || !curveLib) { svg.innerHTML = s; return; }
+    const freqs = curveLib.logFreqs(Math.min(480, Math.round(w / 2)));
+    const pathFor = (model) => freqs.map((f, i) =>
+      `${i ? "L" : "M"}${fx(f).toFixed(1)},${clamp(dy(curveLib.responseDb(model, f)), -4, h + 4).toFixed(1)}`).join("");
+    const cur = curveModel(eqCur), next = curveModel(eqVal);
+    const main = pathFor(next);
+    const st = strips.ch && strips.ch[eqCh - 1];
+    s += `<path class="c-fill" style="fill:${chColor(st)}" d="${main}L${w},${dy(0)}L0,${dy(0)}Z"/>`;
+    if (pending.size) s += `<path class="c-old" d="${pathFor(cur)}"/>`;
+    const sb = next.bands.find((b) => b.id === selBand);
+    if (sb && next.eqOn) s += `<path class="c-band" style="stroke:${BAND_COLORS[sb.id]}" d="${pathFor({ eqOn: true, bands: [sb], lc: null, hc: null })}"/>`;
+    s += `<path class="c-main" d="${main}"/>`;
+    for (const [key, cut, text] of [["lc", next.lc, "HP"], ["hc", next.hc, "LP"]]) {
+      if (!cut) continue;
+      const x = clamp(fx(cut.f), 20, w - 20), y = h - 36;
+      handles.push({ key, filter: true, x, y });
+      s += `<g class="h-flt${cut.on ? "" : " off"}"><rect x="${x - 20}" y="${y - 14}" width="40" height="28" rx="7"/>` +
+        `<text class="hl" x="${x}" y="${y + 5}">${text}</text></g>`;
+    }
+    for (const b of next.bands) {
+      const x = clamp(fx(b.f), 16, w - 16), y = clamp(dy(b.g), 16, h - 16);
+      handles.push({ key: b.id, filter: false, x, y });
+      s += `<g class="h${next.eqOn ? "" : " dim"}">${b.id === selBand ? `<circle class="ring" cx="${x}" cy="${y}" r="20"/>` : ""}` +
+        `<circle cx="${x}" cy="${y}" r="14" style="fill:${BAND_COLORS[b.id]}"/>` +
+        `<text class="hl" x="${x}" y="${y + 5}">${BANDS.find((x) => x.id === b.id).short}</text></g>`;
+    }
+    svg.innerHTML = s;
+  }
+
+  function svgPoint(e) {
+    const r = svg.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) / r.width) * G.w, y: ((e.clientY - r.top) / r.height) * G.h };
+  }
+  function nearestHandle(p, radius) {
+    let best = null, bestD = radius;
+    // Bandas por último no desenho = por cima: procura de trás para frente.
+    for (let i = handles.length - 1; i >= 0; i--) {
+      const hd = handles[i], d = Math.hypot(hd.x - p.x, hd.y - p.y);
+      if (d < bestD) { best = hd; bestD = d; }
+    }
+    return best;
+  }
+  svg.addEventListener("pointerdown", (e) => {
+    const hit = nearestHandle(svgPoint(e), e.pointerType === "touch" ? 36 : 26);
+    if (!hit) return;
+    e.preventDefault();
+    if (!hit.filter) selBand = hit.key;
+    drag = canEditEq() ? { key: hit.key, filter: hit.filter, id: e.pointerId } : null;
+    if (drag) svg.setPointerCapture(e.pointerId);
+    renderEq();
+  });
+  svg.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const p = svgPoint(e);
+    if (drag.filter) setPending("flt", drag.key + "f", xf(p.x));
+    else { setPending("eq", drag.key + "f", xf(p.x)); setPending("eq", drag.key + "g", yd(p.y)); }
+    renderEq();
+  });
+  const endDrag = (e) => { if (drag && e.pointerId === drag.id) { drag = null; sendEq(); } };
+  svg.addEventListener("pointerup", endDrag);
+  svg.addEventListener("pointercancel", endDrag);
+  // Roda do mouse sobre uma banda: Q.
+  svg.addEventListener("wheel", (e) => {
+    const hit = nearestHandle(svgPoint(e), 26);
+    if (!hit || hit.filter || !canEditEq()) return;
+    e.preventDefault();
+    selBand = hit.key;
+    const q = eqVal("eq", hit.key + "q");
+    if (typeof q === "number") setPending("eq", hit.key + "q", q * (e.deltaY < 0 ? 1.06 : 1 / 1.06));
+    renderEq();
+    // Envia quando a roda para (um comando com o Q final, não um por passo da roda).
+    clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(sendEq, 400);
+  }, { passive: false });
+  let wheelTimer = null;
+
+  // ---- controles ----
+  /** Linha [rótulo] [−] [valor] [+]. o: { sec, param(), step(v, dir), fmt, parse } */
+  function stepper(text, o) {
+    const el = document.createElement("div");
+    el.className = "stp";
+    el.innerHTML = `<span class="stp-l"></span><button type="button" class="big" aria-label="Diminuir">−</button>` +
+      `<input class="stp-v" inputmode="decimal" autocomplete="off" spellcheck="false"><button type="button" class="big" aria-label="Aumentar">+</button>`;
+    el.querySelector(".stp-l").textContent = text;
+    const [minus, plus] = el.querySelectorAll("button");
+    const input = el.querySelector("input");
+    const get = () => eqVal(o.sec, o.param());
+    const bump = (dir) => { const v = get(); if (typeof v === "number") { setPending(o.sec, o.param(), o.step(v, dir)); renderEq(); sendEq(); } };
+    minus.addEventListener("click", () => bump(-1));
+    plus.addEventListener("click", () => bump(1));
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+      if (e.key === "Escape") { input.value = o.fmt(get()); input.blur(); }
+    });
+    input.addEventListener("blur", () => {
+      const v = get();
+      if (v == null || input.value === o.fmt(v)) return;
+      const n = o.parse(input.value);
+      if (Number.isNaN(n)) { toast(`${text}: valor inválido (“${input.value}”)`, true); input.value = o.fmt(v); return; }
+      setPending(o.sec, o.param(), n);
+      renderEq();
+      sendEq();
+    });
+    return {
+      el,
+      update() {
+        const v = get(), en = canEditEq() && typeof v === "number";
+        if (document.activeElement !== input) input.value = typeof v === "number" ? o.fmt(v) : "—";
+        input.readOnly = !en;
+        minus.disabled = plus.disabled = !en;
+        el.classList.toggle("changed", isChanged(o.sec, o.param()));
+      },
+    };
+  }
+  /** Botões de escolha (tipo de banda, inclinação). */
+  function segmented(options, o) {
+    const el = document.createElement("div");
+    el.className = "seg";
+    const btns = options.map(([value, text]) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "big";
+      b.textContent = text;
+      b.addEventListener("click", () => { setPending(o.sec, o.param(), value); renderEq(); sendEq(); });
+      el.appendChild(b);
+      return [value, b];
+    });
+    return {
+      el,
+      update() {
+        const v = eqVal(o.sec, o.param()), en = canEditEq() && v != null;
+        for (const [value, b] of btns) { b.classList.toggle("on", value === v); b.disabled = !en; b.setAttribute("aria-pressed", String(value === v)); }
+        el.classList.toggle("changed", isChanged(o.sec, o.param()));
+      },
+    };
+  }
+  /** Botão liga/desliga de um parâmetro int 0..1. */
+  function onOff(btn, sec, param, text) {
+    btn.addEventListener("click", () => { const v = eqVal(sec, param); if (v === 0 || v === 1) { setPending(sec, param, v ? 0 : 1); renderEq(); sendEq(); } });
+    return {
+      update() {
+        const v = eqVal(sec, param);
+        btn.textContent = `${text ? text + " " : ""}${v === 1 ? "ON" : v === 0 ? "OFF" : "—"}`;
+        btn.classList.toggle("on", v === 1);
+        btn.setAttribute("aria-pressed", String(v === 1));
+        btn.disabled = !canEditEq() || v == null;
+        btn.style.boxShadow = isChanged(sec, param) ? "0 0 0 3px var(--go)" : "";
+      },
+    };
+  }
+
+  const freqStep = (v, dir) => v * Math.pow(2, dir / 6); // 1/6 de oitava
+  const controls = [];
+  const bandButtons = {};
+  function buildEqControls() {
+    const bandsEl = document.getElementById("eq-bands");
+    for (const b of BANDS) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "big band";
+      btn.style.setProperty("--bc", BAND_COLORS[b.id]);
+      btn.innerHTML = `<span></span><small></small>`;
+      btn.firstChild.textContent = b.label;
+      btn.addEventListener("click", () => { selBand = b.id; renderEq(); });
+      bandsEl.appendChild(btn);
+      bandButtons[b.id] = btn;
+    }
+    const card = document.getElementById("eq-band-card");
+    card.innerHTML = `<h3 id="eq-band-title"></h3>`;
+    const p = (s) => () => selBand + s;
+    const shapeSeg = segmented([["PEQ", "PEQ"], ["SHV", "Shelf"]], { sec: "eq", param: () => (selBand === "l" ? "leq" : "heq") });
+    const rows = [
+      stepper("Frequência", { sec: "eq", param: p("f"), step: freqStep, fmt: fmtHz, parse: parseHz }),
+      stepper("Ganho dB", { sec: "eq", param: p("g"), step: (v, d) => v + d * 0.5, fmt: fmtGain, parse: parseNum }),
+      stepper("Q", { sec: "eq", param: p("q"), step: (v, d) => v * Math.pow(2, d / 4), fmt: fmtQ, parse: parseNum }),
+    ];
+    for (const r of rows) card.appendChild(r.el);
+    card.appendChild(shapeSeg.el);
+    controls.push(...rows, {
+      update() {
+        const band = BANDS.find((b) => b.id === selBand);
+        card.style.setProperty("--bc", BAND_COLORS[selBand]);
+        const title = document.getElementById("eq-band-title");
+        title.textContent = `Banda ${band.label}`;
+        title.classList.toggle("changed", ["f", "g", "q"].some((s) => isChanged("eq", selBand + s)) || (!!band.shape && isChanged("eq", band.shape)));
+        shapeSeg.el.hidden = !band.shape;
+        if (band.shape) shapeSeg.update();
+      },
+    });
+    for (const [id, title, on, f, s, slopes] of [
+      ["eq-hpf", "Passa-alta (HPF)", "lc", "lcf", "lcs", ["6", "12", "18", "24"]],
+      ["eq-lpf", "Passa-baixa (LPF)", "hc", "hcf", "hcs", ["6", "12"]],
+    ]) {
+      const el = document.getElementById(id);
+      el.innerHTML = `<h3><span></span><button type="button" class="big toggle"></button></h3><p class="eq-risk"></p>`;
+      el.querySelector("h3 span").textContent = title;
+      const riskEl = el.querySelector(".eq-risk");
+      const toggle = onOff(el.querySelector("h3 button"), "flt", on, "");
+      const freq = stepper("Frequência", { sec: "flt", param: () => f, step: freqStep, fmt: fmtHz, parse: parseHz });
+      const slope = segmented(slopes.map((v) => [v, v + " dB/oit"]), { sec: "flt", param: () => s });
+      el.append(freq.el, slope.el);
+      controls.push(toggle, freq, slope, {
+        update() {
+          el.querySelector("h3").classList.toggle("changed", [on, f, s].some((x) => isChanged("flt", x)));
+          // Aviso de risco sempre visível (não há confirmação antes de enviar).
+          const d = eqDesc("flt", on);
+          riskEl.textContent = d && d.risk && canEditEq() ? "⚠ " + d.risk : "";
+        },
+      });
+    }
+    controls.push(onOff(document.getElementById("eq-on"), "eq", "on", "EQ"));
+    document.getElementById("eq-reload").addEventListener("click", () => {
+      if (sending) return toast("Aguarde o envio terminar.", true);
+      pending.clear();
+      loadEq(eqCh);
+    });
+    new ResizeObserver(() => drawEq()).observe(document.getElementById("eq-graph-wrap"));
+  }
+
+  // ---- canais ----
+  const chips = {};
+  function buildChips() {
+    const box = document.getElementById("eq-chips");
+    if (box.childElementCount || !strips.ch) return;
+    for (const st of strips.ch) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "big chip";
+      b.innerHTML = `<b></b><span></span>`;
+      b.addEventListener("click", () => selectEqChannel(st.index));
+      box.appendChild(b);
+      chips[st.index] = b;
+      updateChip(st);
+    }
+  }
+  function updateChip(st) {
+    const b = chips[st.index];
+    if (!b) return;
+    const color = chColor(st);
+    b.style.setProperty("--chip", color);
+    b.style.setProperty("--chip-ink", inkOn(color));
+    b.querySelector("b").textContent = `CH ${st.index}`;
+    b.querySelector("span").textContent = st.name || "—";
+    b.classList.toggle("sel", st.index === eqCh);
+    b.setAttribute("aria-pressed", String(st.index === eqCh));
+    if (st.index === eqCh && !eqPanel.hidden) renderEqHead();
+  }
+
+  function selectEqChannel(ch) {
+    if (ch === eqCh && eqData) return;
+    if (sending || drag) return toast("Aguarde o envio terminar.", true);
+    pending.clear();
+    hideEqStatus();
+    eqData = null;
+    eqCh = ch;
+    try { localStorage.setItem("wing-eq-ch", String(ch)); } catch {}
+    if (strips.ch) strips.ch.forEach(updateChip);
+    scrollToChip();
+    loadEq(ch);
+  }
+  // Rola só a fileira de canais (scrollIntoView rolaria a página inteira).
+  function scrollToChip() {
+    const b = chips[eqCh], box = document.getElementById("eq-chips");
+    if (b) box.scrollLeft = b.offsetLeft - box.offsetLeft - (box.clientWidth - b.offsetWidth) / 2;
+  }
+  function openEq(ch) {
+    showTab("eq");
+    selectEqChannel(ch);
+  }
+  function showEq() {
+    buildChips();
+    if (strips.ch) strips.ch.forEach(updateChip);
+    scrollToChip();
+    // Sem alterações pendentes, relê ao abrir (a mesa pode ter mudado por fora).
+    if (!pending.size || !eqData || eqData.ch !== eqCh) loadEq(eqCh);
+    else renderEq();
+  }
+
+  async function loadEq(ch) {
+    const token = ++eqLoadToken;
+    eqError = null;
+    renderEq();
+    try {
+      const res = await fetch(`/api/channels/${ch}/eq`);
+      const data = await res.json();
+      if (token !== eqLoadToken) return;
+      if (!res.ok) throw new Error(data.error);
+      eqData = data;
+    } catch (e) {
+      if (token !== eqLoadToken) return;
+      eqError = "Não foi possível ler o EQ da mesa: " + e.message;
+    }
+    renderEq();
+  }
+
+  /** Valor vindo da mesa (GET, leitura de volta ou evento da assinatura). */
+  function applyEqValue(d, v) {
+    if (d.type === "list" || d.type === "string") { if (v.kind === "string") d.value = v.text; }
+    else if (v.kind !== "string") d.value = v.value;
+  }
+  const EQ_PATH = /^\/ch\/(\d+)\/(eq|flt)\/([^/]+)$/;
+  function onEqParam(path, value) {
+    const m = EQ_PATH.exec(path);
+    if (!m || !eqData || Number(m[1]) !== eqData.ch) return;
+    if (m[2] === "eq" && m[3] === "mdl" && value.kind === "string") {
+      eqData.model = value.text;
+      eqData.editable = value.text === "STD";
+    } else {
+      const d = eqData[m[2]][m[3]];
+      if (!d) return;
+      applyEqValue(d, value);
+      const k = `${m[2]}/${m[3]}`;
+      if (pending.has(k) && sameValue(d, pending.get(k), d.value)) pending.delete(k);
+    }
+    if (active === "eq") renderEq();
+  }
+
+  function renderEqHead() {
+    const st = strips.ch && strips.ch[eqCh - 1];
+    const color = chColor(st);
+    eqPanel.style.setProperty("--cc", color);
+    eqPanel.style.setProperty("--cc-ink", inkOn(color));
+    document.getElementById("eq-chnum").textContent = `CH ${eqCh}`;
+    document.getElementById("eq-chname").textContent = st && st.name ? st.name : "(sem nome)";
+    document.getElementById("eq-model").textContent = eqData && eqData.model ? `EQ ${eqData.model}` : "";
+  }
+
+  function renderEq() {
+    if (eqPanel.hidden) return;
+    if (!controls.length) buildEqControls();
+    renderEqHead();
+    const msg = document.getElementById("eq-msg");
+    let text = "";
+    if (eqError) text = eqError;
+    else if (!eqData) text = `Lendo o EQ do CH ${eqCh} na mesa…`;
+    else if (!eqData.editable) text = `Este canal usa o EQ ${eqData.model || "?"}: o painel só edita o modelo STD (só leitura aqui).`;
+    else if (!writable()) text = "Somente leitura: dá para ver a curva, mas mudanças pedem WING_ALLOW_WRITES=1.";
+    msg.textContent = text;
+    msg.classList.toggle("err", !!eqError);
+    for (const b of BANDS) {
+      const btn = bandButtons[b.id];
+      const f = eqVal("eq", b.id + "f"), g = eqVal("eq", b.id + "g");
+      btn.querySelector("small").textContent = typeof f === "number" && typeof g === "number" ? `${fmtHz(f)} · ${fmtGain(g)}` : "—";
+      btn.classList.toggle("sel", b.id === selBand);
+      btn.setAttribute("aria-pressed", String(b.id === selBand));
+      btn.classList.toggle("changed", ["f", "g", "q"].some((s) => isChanged("eq", b.id + s)) || (!!b.shape && isChanged("eq", b.shape)));
+    }
+    for (const c of controls) c.update();
+    drawEq();
+  }
+
+  // ---- envio direto ----
+  function eqLabel(sec, p) {
+    if (sec === "flt") {
+      return { lc: "Passa-alta", lcf: "Passa-alta · frequência", lcs: "Passa-alta · inclinação",
+        hc: "Passa-baixa", hcf: "Passa-baixa · frequência", hcs: "Passa-baixa · inclinação" }[p];
+    }
+    if (p === "on") return "EQ";
+    if (p === "leq" || p === "heq") return `Banda ${p === "leq" ? "LOW" : "HIGH"} · tipo`;
+    return `Banda ${BANDS.find((b) => b.id === p[0]).label} · ${{ f: "frequência", g: "ganho", q: "Q" }[p[1]]}`;
+  }
+  function eqFmt(p, v) {
+    if (v == null) return "—";
+    if (p === "on" || p === "lc" || p === "hc") return v === 1 ? "ligado" : "desligado";
+    if (p === "leq" || p === "heq") return v === "SHV" ? "shelf" : "PEQ";
+    if (p === "lcs" || p === "hcs") return v + " dB/oit";
+    if (p.endsWith("f")) return fmtHz(v) + " Hz";
+    if (p.endsWith("g")) return fmtGain(v) + " dB";
+    if (p.endsWith("q")) return fmtQ(v);
+    return String(v);
+  }
+
+  let sending = false;
+  let sendAgain = false;
+  let statusTimer = null;
+  function showEqStatus(kind, main, cmds, risks) {
+    document.getElementById("eq-status").className = `eq-status show ${kind}`;
+    document.getElementById("eq-status-main").textContent = main;
+    // Os últimos comandos enviados, exatamente como saíram para a mesa.
+    document.getElementById("eq-status-cmd").textContent = cmds.slice(-4).join("\n");
+    document.getElementById("eq-status-risk").textContent = [...risks].map((r) => "⚠ " + r).join(" ");
+    clearTimeout(statusTimer);
+    if (kind === "ok") statusTimer = setTimeout(hideEqStatus, 8000);
+  }
+  function hideEqStatus() {
+    clearTimeout(statusTimer);
+    document.getElementById("eq-status").className = "eq-status";
+  }
+
+  /**
+   * Envia o que está pendente, um comando por vez: a rota valida na descrição da mesa,
+   * escreve e lê de volta. Para no primeiro problema e volta a mostrar o que está na mesa.
+   */
+  async function sendEq() {
+    if (!canEditEq() || drag) return;
+    if (sending) { sendAgain = true; return; }
+    sending = true;
+    const ch = eqCh, cmds = [], risks = new Set();
+    let error = null;
+    try {
+      do {
+        sendAgain = false;
+        for (const [key, value] of [...pending]) {
+          const [sec, param] = key.split("/");
+          const cur = eqCur(sec, param);
+          showEqStatus("sending", `Enviando ${eqLabel(sec, param)}: ${eqFmt(param, value)}…`, cmds, risks);
+          const r = await postJson(`/api/channels/${ch}/${sec}`, { param, value });
+          if (r.error) { error = `${eqLabel(sec, param)}: ${r.error}`; break; }
+          cmds.push(r.data.command);
+          if (r.data.risk) risks.add(r.data.risk);
+          if (/^[lh1-4]g$/.test(param) && typeof cur === "number" && value > cur + 6) {
+            risks.add(`Reforço de mais de 6 dB em ${eqLabel(sec, param)}.`);
+          }
+          const d = eqDesc(sec, param);
+          if (d) applyEqValue(d, r.data.readBack);
+          if (pending.get(key) === value) pending.delete(key);
+          renderEq();
+          if (!r.data.ok) { error = `A mesa não confirmou ${r.data.path} (lido: ${r.data.readBack.text}).`; break; }
+        }
+      } while (sendAgain && !error && !drag);
+    } finally {
+      sending = false;
+    }
+    if (error) {
+      pending.clear();
+      renderEq();
+      showEqStatus("err", `${error.replace(/\.?$/, ".")} Nada mais foi enviado.`, cmds, risks);
+    } else if (cmds.length) {
+      const n = cmds.length === 1 ? "1 comando enviado e confirmado" : `${cmds.length} comandos enviados e confirmados`;
+      showEqStatus(risks.size ? "risk" : "ok", `CH ${ch}: ${n} pela mesa (leitura de volta).`, cmds, risks);
+    }
   }
 
   // ---------- status ----------
@@ -470,6 +1151,7 @@
     const wasWritable = document.body.classList.contains("writable");
     document.body.classList.toggle("writable", !!s.writesEnabled);
     if (wasWritable !== !!s.writesEnabled && strips[active]) strips[active].forEach(render);
+    if (wasWritable !== !!s.writesEnabled && active === "eq") renderEq();
     const mode = document.getElementById("mode");
     mode.textContent = s.writesEnabled ? "Escrita liberada" : "Somente leitura";
     mode.className = "badge " + (s.writesEnabled ? "rw" : "ro");
@@ -493,10 +1175,12 @@
     strips = snap.strips;
     lastStatus = snap.status;
     buildTabs();
+    buildChips();
     renderStatus(lastStatus);
     showTab(active);
   });
   es.addEventListener("strip", (e) => { if (kinds.length) render(JSON.parse(e.data)); });
+  es.addEventListener("param", (e) => { const p = JSON.parse(e.data); onEqParam(p.path, p.value); });
   es.addEventListener("status", (e) => { lastStatus = JSON.parse(e.data); renderStatus(lastStatus); });
   es.addEventListener("meters", (e) => {
     const all = JSON.parse(e.data);

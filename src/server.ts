@@ -12,7 +12,8 @@ import {
   validateFader,
   validateGain,
 } from "./wing.ts";
-import { isSafePath, riskWarning } from "./schema.ts";
+import { isSafePath, readBackMatches, riskWarning } from "./schema.ts";
+import { EqRequestError, readChannelEq, writeChannelEq } from "./eq.ts";
 import { STRIP_KINDS } from "./strips.ts";
 import { buildSendRows, destKey, parseDest, sendPaths } from "./sends.ts";
 
@@ -59,19 +60,6 @@ function sendJson(res: http.ServerResponse, code: number, data: unknown): void {
   res.end(JSON.stringify(data));
 }
 
-/**
- * Diferença aceita entre o valor pedido e o lido de volta: a mesa arredonda para o passo
- * mais próximo (ex.: ganho AES50 em passos de 2,5 dB). Para log, meio passo relativo.
- */
-function paramTolerance(min = 0, max = 0, steps = 0, type = "lin"): number {
-  if (type === "int") return 0;
-  // Fader: 1024 passos não lineares em dB (mais finos perto de 0 dB).
-  if (type === "fader") return 0.5;
-  if (!steps || steps < 2) return 0.01;
-  if (type === "log" && min > 0) return max * (Math.pow(max / min, 1 / (steps - 1)) - 1);
-  return (max - min) / (steps - 1) / 2 + 1e-6;
-}
-
 /** Estado completo para a página (channels mantido para compatibilidade). */
 function snapshot() {
   return { status: wing.status, strips: wing.strips, kinds: STRIP_KINDS, channels: wing.channels };
@@ -79,6 +67,9 @@ function snapshot() {
 
 const WRITE_ROUTE = /^\/api\/channels\/(\d+)\/(name|mute|fader|gain)$/;
 const SOURCE_ROUTE = /^\/api\/channels\/(\d+)\/source$/;
+const EQ_WRITE_ROUTE = /^\/api\/channels\/(\d+)\/(eq|flt)$/;
+const EQ_READ_ROUTE = /^\/api\/channels\/(\d+)\/eq$/;
+const curvePath = fileURLToPath(new URL("../public/eq-curve.js", import.meta.url));
 
 async function handleWrite(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<void> {
   if (!allowWrites) return sendJson(res, 403, { error: "Escrita desativada (WING_ALLOW_WRITES=1)" });
@@ -92,11 +83,19 @@ async function handleWrite(req: http.IncomingMessage, res: http.ServerResponse, 
     const body = (await readJson(req)) as { path?: unknown; value?: unknown };
     if (typeof body.path !== "string" || !isSafePath(body.path)) return sendJson(res, 400, { error: "Caminho inválido" });
     const { readBack, desc } = await wing.setParam(body.path, body.value);
-    const ok = desc.type === "list" || desc.type === "string"
-      ? readBack.text === body.value
-      : readBack.kind !== "string" && typeof body.value === "number" &&
-        Math.abs(readBack.value - body.value) <= paramTolerance(desc.min, desc.max, desc.steps, desc.type);
-    return sendJson(res, 200, { ok, readBack });
+    return sendJson(res, 200, { ok: readBackMatches(desc, body.value, readBack), readBack });
+  }
+  const eq = EQ_WRITE_ROUTE.exec(url.pathname);
+  if (eq) {
+    // Um parâmetro por pedido. dryRun: só valida na descrição da mesa e devolve o comando.
+    const body = (await readJson(req)) as { param?: unknown; value?: unknown; dryRun?: unknown };
+    try {
+      return sendJson(res, 200, await writeChannelEq(wing, Number(eq[1]), eq[2]!, body.param, body.value, body.dryRun === true));
+    } catch (e) {
+      // Mesa sem resposta: 502. Pedido inválido ou recusado pela descrição: 400.
+      const msg = (e as Error).message;
+      return sendJson(res, msg.startsWith("Sem resposta") ? 502 : 400, { error: msg });
+    }
   }
   const m = WRITE_ROUTE.exec(url.pathname);
   if (!m) return sendJson(res, 404, { error: "não encontrado" });
@@ -202,6 +201,16 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, { path, value: await wing.getParam(path) });
     } catch (e) {
       sendJson(res, 502, { error: (e as Error).message });
+    }
+  } else if (url.pathname === "/eq-curve.js") {
+    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
+    res.end(await readFile(curvePath));
+  } else if (EQ_READ_ROUTE.test(url.pathname)) {
+    // Só leitura: EQ e filtro do canal, com faixas e valores da descrição da mesa.
+    try {
+      sendJson(res, 200, await readChannelEq(wing, Number(EQ_READ_ROUTE.exec(url.pathname)![1])));
+    } catch (e) {
+      sendJson(res, e instanceof EqRequestError ? 400 : 502, { error: (e as Error).message });
     }
   } else if (SOURCE_ROUTE.test(url.pathname)) {
     // Só leitura: qual fonte alimenta o canal (para mostrar na confirmação de ganho).
