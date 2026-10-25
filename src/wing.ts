@@ -407,21 +407,44 @@ export class WingClient extends EventEmitter<WingEvents> {
     return { readBack: await this.readValue(path), desc: child };
   }
 
+  /** GETs aguardando resposta, por endereço (resolvidos em onOsc). */
+  private pending = new Map<string, Array<(v: WingValue) => void>>();
+
   private readValue(address: string, timeoutMs = 1500): Promise<WingValue> {
     return new Promise((resolve, reject) => {
+      const done = (v: WingValue) => {
+        clearTimeout(timer);
+        resolve(v);
+      };
       const timer = setTimeout(() => {
-        this.off("osc", onOsc);
+        const list = this.pending.get(address);
+        const i = list?.indexOf(done) ?? -1;
+        if (list && i >= 0) list.splice(i, 1);
+        if (list?.length === 0) this.pending.delete(address);
         reject(new Error(`Sem resposta ao ler ${address}`));
       }, timeoutMs);
-      const onOsc = (addr: string, value: WingValue) => {
-        if (addr !== address) return;
-        clearTimeout(timer);
-        this.off("osc", onOsc);
-        resolve(value);
-      };
-      this.on("osc", onOsc);
+      const list = this.pending.get(address);
+      if (list) list.push(done);
+      else this.pending.set(address, [done]);
       this.get(address);
     });
+  }
+
+  /**
+   * Lê muitos parâmetros (só GETs), espaçando os pedidos para não estourar o buffer
+   * UDP da mesa. Parâmetros sem resposta voltam como null.
+   */
+  async readMany(paths: string[], batch = 24): Promise<Map<string, WingValue | null>> {
+    for (const p of paths) if (!isSafePath(p)) throw new Error(`Caminho inválido: ${p}`);
+    const out = new Map<string, WingValue | null>();
+    const promises: Promise<void>[] = [];
+    for (let i = 0; i < paths.length; i++) {
+      const p = paths[i]!;
+      promises.push(this.readValue(p, 2000).then((v) => void out.set(p, v), () => void out.set(p, null)));
+      if (i % batch === batch - 1) await new Promise((r) => setTimeout(r, 5));
+    }
+    await Promise.all(promises);
+    return out;
   }
 
   private async readAllStrips(): Promise<void> {
@@ -458,6 +481,11 @@ export class WingClient extends EventEmitter<WingEvents> {
     }
     const value = parseWingValue(msg.args);
     if (!value) return;
+    const waiting = this.pending.get(msg.address);
+    if (waiting) {
+      this.pending.delete(msg.address);
+      for (const resolve of waiting) resolve(value);
+    }
     this.emit("osc", msg.address, value);
     const st = applyStripValue(this.strips, msg.address, value);
     if (st) this.emit("strip", st);

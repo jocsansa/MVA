@@ -10,6 +10,7 @@
   "scripts": {
     "start": "node src/server.ts",
     "discover": "node src/discover.ts",
+    "simulate": "node src/simulator.ts",
     "test": "node --test --test-timeout=20000 \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test"

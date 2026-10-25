@@ -14,6 +14,7 @@ import {
 } from "./wing.ts";
 import { isSafePath, riskWarning } from "./schema.ts";
 import { STRIP_KINDS } from "./strips.ts";
+import { buildSendRows, destKey, parseDest, sendPaths } from "./sends.ts";
 
 const host = process.env.CONSOLE_HOST;
 if (!host) {
@@ -176,6 +177,16 @@ const server = http.createServer(async (req, res) => {
           return { ...c, path: p, risk: c.kind === "param" && !c.readOnly ? riskWarning(p) : null };
         }),
       });
+    } catch (e) {
+      sendJson(res, 502, { error: (e as Error).message });
+    }
+  } else if (url.pathname === "/api/sends") {
+    // Só leitura: envios de todas as fontes para um destino (ex.: ?dest=bus/3, ?dest=mtx/2).
+    const dest = parseDest(url.searchParams.get("dest") ?? "");
+    if (!dest) return sendJson(res, 400, { error: "Destino inválido (use bus/1..16 ou mtx/1..8)" });
+    try {
+      const values = await wing.readMany(sendPaths(dest));
+      sendJson(res, 200, { dest, key: destKey(dest), rows: buildSendRows(dest, values) });
     } catch (e) {
       sendJson(res, 502, { error: (e as Error).message });
     }

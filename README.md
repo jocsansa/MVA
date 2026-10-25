@@ -1,23 +1,54 @@
 # WING Remote
 
-Controle da Behringer WING pela rede, com interface no navegador.
-**Fase atual: somente leitura** — o app não envia nenhuma escrita para a mesa.
+Controle da Behringer WING pela rede, com interface no navegador (Node.js + TypeScript).
+Por padrão o app é **somente leitura**; comandos só com `WING_ALLOW_WRITES=1` e sempre
+com confirmação na página.
 
-## Uso
+## Instalar (em qualquer computador)
+
+1. Instale o **Node.js 22.18 ou mais novo** (LTS em https://nodejs.org).
+2. Baixe o projeto e as dependências:
 
 ```
+git clone https://github.com/jocsansa/MVA.git
+cd MVA
 npm install
+npm run check               # checagem de tipos + testes
+```
+
+## Usar sem a mesa (mesa simulada)
+
+Dois terminais na pasta do projeto:
+
+```
+npm run simulate            # terminal 1: mesa simulada em 127.0.0.1
+```
+
+macOS / Linux, terminal 2:
+
+```
+CONSOLE_HOST=127.0.0.1 WING_ALLOW_WRITES=1 npm start
+```
+
+Windows (PowerShell), terminal 2:
+
+```
+$env:CONSOLE_HOST="127.0.0.1"; $env:WING_ALLOW_WRITES="1"; npm start
+```
+
+Abra http://localhost:3000. A mesa simulada (`src/simulator.ts`) imita a WING real
+(firmware 3.1): respostas OSC, descrição de nós, assinatura, envios e medidores em
+movimento. Escritas só mudam a memória do simulador e aparecem no terminal 1.
+
+## Usar com a WING real
+
+```
 npm run discover            # procura a WING na rede (envia 'WING?' em UDP 2222)
-CONSOLE_HOST=<ip-da-wing> npm start
+CONSOLE_HOST=<ip-da-wing> npm start                      # somente leitura
+CONSOLE_HOST=<ip-da-wing> WING_ALLOW_WRITES=1 npm start  # libera comandos
 ```
 
-Abra http://localhost:3000 (mude com `PORT=`).
-
-## Verificação
-
-```
-npm run check               # tsc --noEmit + testes
-```
+No Windows use `$env:CONSOLE_HOST="<ip>"; npm start`. A porta da página muda com `PORT`.
 
 ## Protocolo (fonte: WING Remote Protocols, P.-G. Maillot)
 
@@ -74,6 +105,11 @@ rota genérica (`POST /api/param`) é conferida contra essa descrição antes de
 | `GET /api/describe?path=/ch/1` | Descrição do nó com valores atuais e avisos de risco |
 | `GET /api/param?path=/ch/1/pan` | Lê um parâmetro |
 | `POST /api/param` `{path, value}` | Escreve um parâmetro (só com `WING_ALLOW_WRITES=1`) |
+| `GET /api/sends?dest=bus/1` | Envios de todas as fontes para um bus (ou `mtx/1..8`) |
+
+Envios: canais e aux mandam para buses 1–16 e matrizes MX1–MX8 (`on`, `lvl`, `mode`
+PRE/POST/GRP); buses e mains mandam só para as matrizes e usam `pre` (0/1) no lugar
+de `mode`. Envio de bus para bus existe mas é somente leitura.
 
 Medidores: uma coleção só com todos os tipos (tokens `0xa0`..`0xa5`; na WING real um pedido
 novo substitui o anterior na mesma conexão), 8 valores por

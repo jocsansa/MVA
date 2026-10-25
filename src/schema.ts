@@ -162,6 +162,12 @@ export function riskWarning(path: string): string | null {
     return "Entrada física: muda todos os canais que usam essa entrada.";
   }
   if (/^\/(\$ctl|cfg|\$syscfg)(\/|$)/.test(path)) return "Configuração/controle da mesa: pode afetar a mesa inteira.";
+  if (/\/send\/\d+\/(on|lvl|mode|pre|pan|pon|plink)$/.test(path)) {
+    return "Envio para bus: muda o retorno (fone/monitor) de quem usa esse mix.";
+  }
+  if (/\/send\/MX\d+\/(on|lvl|mode|pre|pan|pon|plink)$/.test(path)) {
+    return "Envio para matriz: muda o que sai nessa matriz (PA, fills, transmissão).";
+  }
   if (/^\/main\/\d+\/(mute|fdr)$/.test(path)) return "Main: afeta o som do PA inteiro.";
   if (/^\/dca\/\d+\/(mute|fdr)$/.test(path)) return "DCA: afeta todos os canais atribuídos a ele.";
   if (/^\/mgrp\/\d+\/mute$/.test(path)) return "Mute group: muta/desmuta vários canais de uma vez.";
