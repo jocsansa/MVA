@@ -31,6 +31,7 @@ export const NATIVE_PORT = 2222;
 export const CHANNEL_COUNT = 40;
 
 const SUBSCRIBE_EVERY_MS = 8000; // assinatura morre após 10 s
+const OSC_SILENCE_MS = 12000; // sem resposta OSC por esse tempo: recria o socket
 const METER_RENEW_EVERY_MS = 3000; // medidores param após 5 s
 const METER_REPORT_ID = 1;
 
@@ -162,7 +163,9 @@ export interface WingStatus {
 export class WingClient extends EventEmitter<WingEvents> {
   readonly channels: ChannelState[];
   readonly status: WingStatus;
-  private osc = dgram.createSocket("udp4");
+  private osc!: dgram.Socket;
+  private startedAt = 0;
+  private reconnecting = false;
   private meterUdp = dgram.createSocket("udp4");
   private tcp: net.Socket | null = null;
   private timers: NodeJS.Timeout[] = [];
@@ -172,8 +175,20 @@ export class WingClient extends EventEmitter<WingEvents> {
   readonly allowWrites: boolean;
   private readonly ports: { osc: number; native: number };
 
-  constructor(host: string, opts: { ports?: { osc: number; native: number }; allowWrites?: boolean } = {}) {
+  private readonly heartbeatMs: number;
+  private readonly silenceMs: number;
+
+  constructor(
+    host: string,
+    opts: {
+      ports?: { osc: number; native: number };
+      allowWrites?: boolean;
+      timing?: { heartbeatMs: number; silenceMs: number };
+    } = {},
+  ) {
     super();
+    this.heartbeatMs = opts.timing?.heartbeatMs ?? 5000;
+    this.silenceMs = opts.timing?.silenceMs ?? OSC_SILENCE_MS;
     this.host = host;
     this.ports = opts.ports ?? { osc: OSC_PORT, native: NATIVE_PORT };
     this.allowWrites = opts.allowWrites ?? false;
@@ -188,21 +203,55 @@ export class WingClient extends EventEmitter<WingEvents> {
     this.status = { host, writesEnabled: this.allowWrites, consoleInfo: null, lastOscAt: null, lastMeterAt: null, error: null };
   }
 
+  private async bindOsc(): Promise<void> {
+    const sock = dgram.createSocket("udp4");
+    sock.on("message", (buf) => this.onOsc(buf));
+    sock.on("error", (e) => this.setError(`OSC: ${e.message}`));
+    await new Promise<void>((r) => sock.bind(0, r));
+    this.osc = sock;
+  }
+
+  /**
+   * Depois que a mesa reinicia, o socket antigo pode parar de receber respostas
+   * (visto na prática com a WING real). Sem resposta por OSC_SILENCE_MS: abre um
+   * socket novo, reassina e relê tudo. Só leituras.
+   */
+  private async checkOscAlive(): Promise<void> {
+    const last = this.status.lastOscAt ?? this.startedAt;
+    if (this.closed || this.reconnecting || Date.now() - last < this.silenceMs) return;
+    this.reconnecting = true;
+    try {
+      const old = this.osc;
+      await this.bindOsc();
+      old.close();
+      this.startedAt = Date.now();
+      this.get("/?");
+      this.get("/*s");
+      await this.readAllChannels();
+    } finally {
+      this.reconnecting = false;
+    }
+  }
+
   async start(): Promise<void> {
-    this.osc.on("message", (buf) => this.onOsc(buf));
-    this.osc.on("error", (e) => this.setError(`OSC: ${e.message}`));
-    await new Promise<void>((r) => this.osc.bind(0, r));
+    await this.bindOsc();
 
     this.meterUdp.on("message", (buf) => this.onMeterPacket(buf));
     this.meterUdp.on("error", (e) => this.setError(`medidores UDP: ${e.message}`));
     await new Promise<void>((r) => this.meterUdp.bind(0, r));
 
+    this.startedAt = Date.now();
     this.get("/?");
     await this.readAllChannels();
 
     this.get("/*s");
     // Heartbeat: "/?" é só leitura e mantém lastOscAt atualizado.
-    this.timers.push(setInterval(() => this.get("/?"), 5000));
+    this.timers.push(
+      setInterval(() => {
+        this.get("/?");
+        void this.checkOscAlive();
+      }, this.heartbeatMs),
+    );
     this.timers.push(setInterval(() => this.get("/*s"), SUBSCRIBE_EVERY_MS));
     // Releitura periódica: cobre eventos perdidos (UDP) e serve de keep-alive.
     this.timers.push(setInterval(() => void this.readAllChannels(), 30000));
@@ -464,7 +513,7 @@ export class WingClient extends EventEmitter<WingEvents> {
     this.closed = true;
     for (const t of this.timers) clearInterval(t);
     this.tcp?.destroy();
-    this.osc.close();
+    this.osc?.close();
     this.meterUdp.close();
   }
 }

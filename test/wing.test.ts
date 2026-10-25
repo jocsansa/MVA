@@ -74,3 +74,29 @@ test("cliente só envia leituras (GET sem argumentos) e lê os canais", async ()
   assert.ok(nativeBytes.length > 0);
   assert.ok(nativeBytes.every((b) => b !== -1), "dados enviados fora do canal de medidores");
 });
+
+test("socket OSC mudo (mesa reiniciou): o cliente abre um socket novo e volta a ler", async () => {
+  const { fakeWing } = await import("./fake-wing.ts");
+  const fake = await fakeWing({ "/ch/1/name": "Vox" });
+  const client = new WingClient("127.0.0.1", {
+    ports: fake.ports,
+    timing: { heartbeatMs: 100, silenceMs: 400 },
+  });
+  client.on("status", () => {});
+  try {
+    await client.start();
+    await new Promise((r) => setTimeout(r, 150));
+    assert.equal(fake.clientPorts.size, 1);
+    // A mesa passa a ignorar o socket atual.
+    const [first] = [...fake.clientPorts];
+    fake.ignoredPorts.add(first!);
+    fake.values.set("/ch/1/name", "Vox 2");
+    await new Promise((r) => setTimeout(r, 1500));
+    assert.ok(fake.clientPorts.size >= 2, "deveria ter aberto um socket novo");
+    assert.equal(client.channels[0]!.name, "Vox 2");
+    assert.ok(Date.now() - client.status.lastOscAt! < 1000);
+  } finally {
+    client.close();
+    fake.close();
+  }
+});

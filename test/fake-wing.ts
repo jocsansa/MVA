@@ -19,8 +19,13 @@ export async function fakeWing(
   const values = new Map<string, string | number>(Object.entries(initial));
   const writes: OscMessage[] = [];
   const queries: string[] = [];
+  // Portas de cliente que a mesa falsa ignora (simula o socket "mudo" depois de reiniciar a mesa).
+  const ignoredPorts = new Set<number>();
+  const clientPorts = new Set<number>();
   const osc = dgram.createSocket("udp4");
   osc.on("message", (buf, rinfo) => {
+    clientPorts.add(rinfo.port);
+    if (ignoredPorts.has(rinfo.port)) return;
     const msg = decodeMessage(buf);
     const a = msg.args[0];
     if (a?.type === "s" && a.value === "#" && msg.args.length === 1) {
@@ -56,5 +61,5 @@ export async function fakeWing(
   tcp.listen(0, "127.0.0.1");
   await once(tcp, "listening");
   const ports = { osc: osc.address().port, native: (tcp.address() as net.AddressInfo).port };
-  return { ports, writes, queries, values, close: () => (osc.close(), tcp.close()) };
+  return { ports, writes, queries, values, ignoredPorts, clientPorts, close: () => (osc.close(), tcp.close()) };
 }
