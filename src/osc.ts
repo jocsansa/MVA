@@ -117,7 +117,12 @@ export function parseWingValue(args: OscArg[]): WingValue | null {
     return { kind: "float", text: a0.value, raw: a1.value, value: a2.value };
   }
   if (a0?.type === "s" && a1?.type === "f" && a2?.type === "i") {
-    return { kind: "int", text: a0.value, raw: a1.value, value: a2.value };
+    // Na WING real o inteiro é a POSIÇÃO na faixa (valor - mínimo), não o valor:
+    // /ch/N/col (1..18) responde ["5", 0.235, 4]; /ch/N/in/conn/in responde ["5", ..., 4].
+    // O texto traz o valor real, então ele vale quando é um inteiro.
+    const fromText = Number(a0.value);
+    const value = a0.value.trim() !== "" && Number.isInteger(fromText) ? fromText : a2.value;
+    return { kind: "int", text: a0.value, raw: a1.value, value };
   }
   if (a0?.type === "s" && args.length === 1) return { kind: "string", text: a0.value };
   if (a0?.type === "f" && args.length === 1) {

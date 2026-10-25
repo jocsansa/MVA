@@ -22,6 +22,21 @@ test("decodifica resposta ,sfi do mute (bytes da documentação)", () => {
   assert.deepEqual(parseWingValue(msg.args), { kind: "int", text: "1", raw: 1, value: 1 });
 });
 
+test(",sfi: o valor vem do texto; o inteiro é a posição na faixa (respostas reais da WING)", () => {
+  // /ch/36/col depois de ",i 5": ["5", 0.235, 4]
+  assert.deepEqual(
+    parseWingValue([{ type: "s", value: "5" }, { type: "f", value: 0.23529411852359772 }, { type: "i", value: 4 }]),
+    { kind: "int", text: "5", raw: 0.23529411852359772, value: 5 },
+  );
+  // /bus/1/col: ["10", 0.529, 9]
+  assert.equal(parseWingValue([{ type: "s", value: "10" }, { type: "f", value: 0.529 }, { type: "i", value: 9 }])!.kind, "int");
+  assert.equal((parseWingValue([{ type: "s", value: "10" }, { type: "f", value: 0.529 }, { type: "i", value: 9 }]) as { value: number }).value, 10);
+  // /ch/1/icon (0..999): ["101", 0.101, 101] — faixa começa em 0, igual
+  assert.equal((parseWingValue([{ type: "s", value: "101" }, { type: "f", value: 0.101 }, { type: "i", value: 101 }]) as { value: number }).value, 101);
+  // Texto não numérico: cai no inteiro
+  assert.equal((parseWingValue([{ type: "s", value: "ON" }, { type: "f", value: 1 }, { type: "i", value: 1 }]) as { value: number }).value, 1);
+});
+
 test("ida e volta com todos os tipos", () => {
   const original = {
     address: "/x/y",
