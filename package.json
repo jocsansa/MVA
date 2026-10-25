@@ -1,0 +1,21 @@
+{
+  "name": "wing-remote",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Controle da Behringer WING via OSC, com interface no navegador",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node src/server.ts",
+    "discover": "node src/discover.ts",
+    "test": "node --test --test-timeout=20000 \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}
