@@ -1,12 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { encodeChannelData, METER_CHANNEL, meterRequest, parseMeterWords } from "../src/native.ts";
+import { encodeChannelData, METER_CHANNEL, meterRequest, meterRequestMulti } from "../src/native.ts";
 import {
   STRIP_INFO,
   STRIP_KINDS,
   applyStripValue,
   createStrips,
-  meterReportId,
+  METER_REPORT_ID,
+  meterGroups,
+  splitMeterPacket,
   stripMeterFromWords,
   stripPaths,
 } from "../src/strips.ts";
@@ -43,23 +45,44 @@ test("valores de bus, dca e mute group; parâmetros fora do tipo são ignorados"
   assert.equal(applyStripValue(s, "/bus/17/name", { kind: "string", text: "x" }), null);
 });
 
-test("pedido de medidores por tipo: report id e token (Table 4)", () => {
-  assert.equal(meterReportId("ch"), 1);
-  assert.equal(meterReportId("dca"), 6);
-  const bus = meterRequest(meterReportId("bus"), STRIP_INFO.bus.meter!.token, [1, 2]);
+test("pedido de medidores: token por tipo (Table 4) e uma coleção com vários tipos", () => {
+  const bus = meterRequest(3, STRIP_INFO.bus.meter!.token, [1, 2]);
   assert.equal(encodeChannelData(METER_CHANNEL, bus).toString("hex"), "dfd3d400000003dca20001de");
+  // Exemplo da doc: canais 1, 2, 9 e fx 5 numa coleção só.
+  assert.equal(
+    meterRequestMulti(2, [{ token: 0xa0, indices: [1, 2, 9] }, { token: 0xa6, indices: [5] }]).toString("hex"),
+    "d400000002dca0000108a604de",
+  );
   assert.throws(() => meterRequest(1, 0xa0, [0]));
+  // Coleção única: ch, aux, bus, main, mtx, dca, nessa ordem.
+  const all = meterRequestMulti(METER_REPORT_ID, meterGroups());
+  const tokens = [...all].filter((b) => b >= 0xa0 && b <= 0xa5);
+  assert.deepEqual(tokens, [0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5]);
+  assert.equal(all.length, 5 + 1 + 6 + (40 + 8 + 16 + 4 + 8 + 16) + 1);
 });
 
-test("parse de medidores: 8 valores por strip e 4 no DCA (pós-fader nas posições 2 e 3)", () => {
-  const pkt = Buffer.alloc(4 + 2 * 4 * 2);
-  pkt.writeUInt32BE(6, 0);
-  pkt.writeInt16BE(-10 * 256, 4 + 2 * 2); // dca 1 post L
-  pkt.writeInt16BE(-11 * 256, 4 + 3 * 2); // dca 1 post R
-  const r = parseMeterWords(pkt, 4)!;
-  assert.equal(r.reportId, 6);
-  assert.equal(r.strips.length, 2);
-  assert.deepEqual(stripMeterFromWords(r.strips[0]!), { l: -10, r: -11 });
+test("parse da coleção única: 8 valores por strip e 4 no DCA (saída nas posições 2 e 3)", () => {
+  const before = (40 + 8 + 16 + 4 + 8) * 8; // palavras antes do primeiro DCA
+  const pkt = Buffer.alloc(4 + (before + 16 * 4) * 2);
+  pkt.writeUInt32BE(METER_REPORT_ID, 0);
+  pkt.writeInt16BE(-12 * 256, 4 + 2 * 2); // ch 1 saída L
+  pkt.writeInt16BE(-6 * 256, 4 + ((40 + 8) * 8 + 3) * 2); // bus 1 saída R
+  pkt.writeInt16BE(-10 * 256, 4 + (before + 2) * 2); // dca 1 pós-fader L
+  pkt.writeInt16BE(-11 * 256, 4 + (before + 3) * 2); // dca 1 pós-fader R
+  const r = splitMeterPacket(pkt)!;
+  assert.equal(r.length, 92);
+  assert.equal(r[0]!.kind, "ch");
+  assert.equal(r[0]!.meter!.l, -12);
+  const bus1 = r.find((m) => m.kind === "bus" && m.index === 1)!;
+  assert.equal(bus1.meter!.r, -6);
+  const dca1 = r.find((m) => m.kind === "dca" && m.index === 1)!;
+  assert.deepEqual(dca1.meter, { l: -10, r: -11 });
+  // Outro report id é ignorado; pacote curto devolve só o que coube.
+  const other = Buffer.from(pkt);
+  other.writeUInt32BE(9, 0);
+  assert.equal(splitMeterPacket(other), null);
+  assert.equal(splitMeterPacket(pkt.subarray(0, 4 + 8 * 2 * 2))!.length, 2);
+  assert.deepEqual(stripMeterFromWords([0, 0, -1, -2]), { l: -1, r: -2 });
 });
 
 test("avisos de risco de main, DCA e mute group", () => {

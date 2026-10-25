@@ -120,7 +120,37 @@ export function stripMeterFromWords(words: number[]): StripMeter | null {
   return l === undefined || r === undefined ? null : { l, r };
 }
 
-/** Report id de medidor por tipo de strip (1..6), para separar as coleções. */
-export function meterReportId(kind: StripKind): number {
-  return STRIP_KINDS.findIndex((k) => k.kind === kind) + 1;
+/** Report id da coleção única de medidores. */
+export const METER_REPORT_ID = 1;
+
+/** Tipos com medidor, na ordem em que vão no pedido (e voltam no pacote). */
+export const METERED_KINDS = STRIP_KINDS.filter((k) => k.meter);
+
+/** Grupos do pedido de medidores: todos os strips de todos os tipos com medidor. */
+export function meterGroups(): { token: number; indices: number[] }[] {
+  return METERED_KINDS.map((k) => ({
+    token: k.meter!.token,
+    indices: Array.from({ length: k.count }, (_, i) => i + 1),
+  }));
+}
+
+/**
+ * Separa o pacote da coleção única em medidores por strip, na ordem do pedido.
+ * Pacote: report id (4 bytes) + int16 BE em 1/256 dB.
+ */
+export function splitMeterPacket(packet: Buffer): { kind: StripKind; index: number; meter: StripMeter | null }[] | null {
+  if (packet.length < 4 || packet.readUInt32BE(0) !== METER_REPORT_ID) return null;
+  const out: { kind: StripKind; index: number; meter: StripMeter | null }[] = [];
+  let off = 4;
+  for (const k of METERED_KINDS) {
+    const words = k.meter!.words;
+    for (let i = 1; i <= k.count; i++) {
+      if (off + words * 2 > packet.length) return out;
+      const vals: number[] = [];
+      for (let w = 0; w < words; w++) vals.push(packet.readInt16BE(off + w * 2) / 256);
+      out.push({ kind: k.kind, index: i, meter: stripMeterFromWords(vals) });
+      off += words * 2;
+    }
+  }
+  return out;
 }

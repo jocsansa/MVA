@@ -21,15 +21,15 @@ import {
   encodeChannelData,
   meterPortRequest,
   meterRenewRequest,
-  meterRequest,
-  parseMeterWords,
+  meterRequestMulti,
 } from "./native.ts";
 import {
   STRIP_KINDS,
   applyStripValue,
   createStrips,
-  meterReportId,
-  stripMeterFromWords,
+  METER_REPORT_ID,
+  meterGroups,
+  splitMeterPacket,
   stripPaths,
   type StripState,
   type Strips,
@@ -471,15 +471,12 @@ export class WingClient extends EventEmitter<WingEvents> {
     sock.on("connect", () => {
       const port = this.meterUdp.address().port;
       sock.write(encodeChannelData(METER_CHANNEL, meterPortRequest(port)));
-      // Uma coleção por tipo de strip, cada uma com seu report id.
-      const kinds = STRIP_KINDS.filter((k) => k.meter);
-      for (const k of kinds) {
-        const indices = Array.from({ length: k.count }, (_, i) => i + 1);
-        sock.write(encodeChannelData(METER_CHANNEL, meterRequest(meterReportId(k.kind), k.meter!.token, indices)));
-      }
-      renew = setInterval(() => {
-        for (const k of kinds) sock.write(encodeChannelData(METER_CHANNEL, meterRenewRequest(meterReportId(k.kind))));
-      }, METER_RENEW_EVERY_MS);
+      // Uma coleção só com todos os tipos: na WING real, cada pedido novo substitui o anterior.
+      sock.write(encodeChannelData(METER_CHANNEL, meterRequestMulti(METER_REPORT_ID, meterGroups())));
+      renew = setInterval(
+        () => sock.write(encodeChannelData(METER_CHANNEL, meterRenewRequest(METER_REPORT_ID))),
+        METER_RENEW_EVERY_MS,
+      );
     });
     sock.on("data", () => {
       // Nada a fazer: só pedimos medidores, que chegam por UDP.
@@ -492,17 +489,13 @@ export class WingClient extends EventEmitter<WingEvents> {
   }
 
   private onMeterPacket(buf: Buffer): void {
-    if (buf.length < 4) return;
-    const kindInfo = STRIP_KINDS[buf.readUInt32BE(0) - 1];
-    if (!kindInfo?.meter) return;
-    const parsed = parseMeterWords(buf, kindInfo.meter.words);
+    const parsed = splitMeterPacket(buf);
     if (!parsed) return;
     this.status.lastMeterAt = Date.now();
-    const list = this.strips[kindInfo.kind];
-    parsed.strips.forEach((words, i) => {
-      const st = list[i];
-      if (st) st.meter = stripMeterFromWords(words);
-    });
+    for (const m of parsed) {
+      const st = this.strips[m.kind][m.index - 1];
+      if (st) st.meter = m.meter;
+    }
     this.emit("meters", this.strips);
   }
 

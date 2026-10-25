@@ -75,7 +75,8 @@ rota genérica (`POST /api/param`) é conferida contra essa descrição antes de
 | `GET /api/param?path=/ch/1/pan` | Lê um parâmetro |
 | `POST /api/param` `{path, value}` | Escreve um parâmetro (só com `WING_ALLOW_WRITES=1`) |
 
-Medidores: uma coleção por tipo (report id 1..6; tokens `0xa0`..`0xa5`), 8 valores por
+Medidores: uma coleção só com todos os tipos (tokens `0xa0`..`0xa5`; na WING real um pedido
+novo substitui o anterior na mesma conexão), 8 valores por
 strip e 4 no DCA; a página mostra a saída (L/R).
 
 ### Ganho: cuidados

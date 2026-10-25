@@ -94,10 +94,23 @@ export function meterChannelsRequest(reportId: number, channels: number[]): Buff
  * 0xa4 matrix, 0xa5 dca) para os índices 1-based dados, sob um report id.
  */
 export function meterRequest(reportId: number, token: number, indices: number[]): Buffer {
-  const b: number[] = [TOK_REPORT_ID, ...u32(reportId), TOK_COLLECTION_START, token];
-  for (const i of indices) {
-    if (!Number.isInteger(i) || i < 1 || i > 128) throw new Error(`índice de medidor fora da faixa: ${i}`);
-    b.push(i - 1);
+  return meterRequestMulti(reportId, [{ token, indices }]);
+}
+
+/**
+ * Uma única coleção com vários tipos ("Meter collections are specified by using multiple
+ * type/index elements"; exemplo da doc: dc a0 00 01 08 a6 04 de). Os valores voltam na
+ * ordem do pedido. Na WING real, um pedido novo substitui o anterior na mesma conexão,
+ * por isso tudo vai numa coleção só.
+ */
+export function meterRequestMulti(reportId: number, groups: { token: number; indices: number[] }[]): Buffer {
+  const b: number[] = [TOK_REPORT_ID, ...u32(reportId), TOK_COLLECTION_START];
+  for (const g of groups) {
+    b.push(g.token);
+    for (const i of g.indices) {
+      if (!Number.isInteger(i) || i < 1 || i > 128) throw new Error(`índice de medidor fora da faixa: ${i}`);
+      b.push(i - 1);
+    }
   }
   b.push(TOK_COLLECTION_END);
   return Buffer.from(b);
