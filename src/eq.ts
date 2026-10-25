@@ -5,9 +5,8 @@
 // Toda escrita passa por WingClient.setParam: confere a descrição atual do nó, escreve uma
 // vez e lê de volta. Com dryRun só valida e devolve o comando exato (nada é escrito).
 
-import type { WingValue } from "./osc.ts";
-import { parseWingNumber, readBackMatches, riskWarning, type NodeChild, type ParamDesc, type ParamType } from "./schema.ts";
-import { describeMessage, isValidChannel, type WingClient } from "./wing.ts";
+import { parseWingNumber, riskWarning, type NodeChild, type ParamDesc, type ParamType } from "./schema.ts";
+import { isValidChannel, writeParam, type ParamWriteResult, type WingClient } from "./wing.ts";
 
 export type EqSection = "eq" | "flt";
 
@@ -106,10 +105,6 @@ export async function readChannelEq(wing: WingClient, ch: number): Promise<Chann
 /** Erro do pedido (canal, seção ou parâmetro fora do que a rota aceita). */
 export class EqRequestError extends Error {}
 
-export type EqWriteResult =
-  | { dryRun: true; path: string; command: string; risk: string | null }
-  | { dryRun: false; ok: boolean; path: string; command: string; risk: string | null; readBack: WingValue };
-
 /**
  * Escreve UM parâmetro de EQ/filtro do canal (ou só valida, com dryRun).
  * A validação de tipo/faixa/opções é a da descrição atual do nó na mesa.
@@ -121,18 +116,12 @@ export async function writeChannelEq(
   param: unknown,
   value: unknown,
   dryRun = false,
-): Promise<EqWriteResult> {
+): Promise<ParamWriteResult> {
   if (!isEqSection(section)) throw new EqRequestError(`Seção inválida: ${section} (use eq ou flt)`);
   const path = typeof param === "string" ? eqParamPath(ch, section, param) : null;
   if (!path) {
     if (!isValidChannel(ch)) throw new EqRequestError(`Canal inválido: ${ch}`);
     throw new EqRequestError(`Parâmetro inválido em ${section}: ${String(param)} (aceitos: ${SECTION_PARAMS[section].join(", ")})`);
   }
-  const risk = riskWarning(path);
-  if (dryRun) {
-    const { message } = await wing.previewParam(path, value);
-    return { dryRun: true, path, command: describeMessage(message), risk };
-  }
-  const { readBack, desc, message } = await wing.setParam(path, value);
-  return { dryRun: false, ok: readBackMatches(desc, value, readBack), path, command: describeMessage(message), risk, readBack };
+  return writeParam(wing, path, value, dryRun);
 }

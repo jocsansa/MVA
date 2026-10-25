@@ -12,6 +12,8 @@ import {
   encodeParamValue,
   isSafePath,
   parseNodeDescription,
+  readBackMatches,
+  riskWarning,
   splitPath,
   type NodeChild,
   type ParamDesc,
@@ -141,6 +143,25 @@ export function gainMessage(src: InputSource, db: number): OscMessage {
 export function describeMessage(m: OscMessage): string {
   const args = m.args.map((a) => (a.type === "s" ? JSON.stringify(a.value) : String(a.value)));
   return `${m.address} ,${m.args.map((a) => a.type).join("")} ${args.join(" ")}`.trim();
+}
+
+export type ParamWriteResult =
+  | { dryRun: true; path: string; command: string; risk: string | null }
+  | { dryRun: false; ok: boolean; path: string; command: string; risk: string | null; readBack: WingValue };
+
+/**
+ * Escreve UM parâmetro (ou só valida, com dryRun) pela validação genérica: descrição atual
+ * do nó na mesa, comando exato, aviso de risco e leitura de volta. As rotas específicas
+ * (EQ, sends) decidem antes quais caminhos aceitam.
+ */
+export async function writeParam(wing: WingClient, path: string, value: unknown, dryRun = false): Promise<ParamWriteResult> {
+  const risk = riskWarning(path);
+  if (dryRun) {
+    const { message } = await wing.previewParam(path, value);
+    return { dryRun: true, path, command: describeMessage(message), risk };
+  }
+  const { readBack, desc, message } = await wing.setParam(path, value);
+  return { dryRun: false, ok: readBackMatches(desc, value, readBack), path, command: describeMessage(message), risk, readBack };
 }
 
 export interface WingEvents {

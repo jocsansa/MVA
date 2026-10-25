@@ -82,12 +82,12 @@
   .eq-tag { flex:0 0 32px; cursor:pointer; }
   .eq-tag:hover { border-color:var(--text); color:var(--text); }
 
-  /* ---------- painel de EQ: escuro de alto contraste, cor da WING como identidade do canal,
-     alvos de toque grandes (48px ou mais) ---------- */
-  #eq { --ink:#fff; --ink2:#c8ced6; --bg0:#000; --bg1:#0c0e11; --bg2:#181b20; --edge:#4a525e; --go:#ffd400;
+  /* ---------- painéis de EQ e sends: escuro de alto contraste, cor da WING como identidade do
+     canal, alvos de toque grandes (48px ou mais) ---------- */
+  #eq, #sends { --ink:#fff; --ink2:#c8ced6; --bg0:#000; --bg1:#0c0e11; --bg2:#181b20; --edge:#4a525e; --go:#ffd400;
     --cc:#6b7c93; --cc-ink:#fff; padding:12px 16px 104px; color:var(--ink); color-scheme:dark; }
-  #eq[hidden], #grid[hidden] { display:none; }
-  body.eq-mode { background:#000; }
+  #eq[hidden], #sends[hidden], #grid[hidden] { display:none; }
+  body.panel-mode { background:#000; }
   .big { min-height:48px; min-width:48px; padding:0 16px; font:inherit; font-size:16px; font-weight:700; color:var(--ink);
     background:var(--bg2); border:2px solid var(--edge); border-radius:10px; cursor:pointer; touch-action:manipulation; }
   .big:disabled { opacity:.4; cursor:default; }
@@ -167,7 +167,44 @@
     overflow-wrap:anywhere; }
   .eq-status-risk { color:var(--go); font-size:14px; font-weight:600; }
   .eq-status-cmd:empty, .eq-status-risk:empty { display:none; }
+
+  /* ---------- visão de sends ---------- */
+  .snd-dests { display:flex; flex-direction:column; gap:6px; }
+  .snd-row-l { font-size:13px; font-weight:700; color:var(--ink2); }
+  .snd-head-risk { margin:-4px 0 12px; }
+  .snd-group h3 { margin:16px 0 8px; font-size:15px; color:var(--ink2); }
+  .snd-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(132px, 1fr)); gap:8px; }
+  .sst { position:relative; min-width:0; display:flex; flex-direction:column; gap:8px; padding:8px; background:var(--bg1);
+    border:2px solid var(--edge); border-top:8px solid var(--sc); border-radius:12px; }
+  .sst[hidden] { display:none; }
+  .sst.changed { border-color:var(--go); border-top-color:var(--sc); }
+  .sst-id { font-size:12px; font-weight:800; color:var(--ink2); }
+  .sst-name { min-height:1.3em; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sst .big.toggle { padding:0 8px; }
+  .fdr { position:relative; height:220px; background:var(--bg0); border:2px solid var(--edge); border-radius:10px;
+    touch-action:none; cursor:ns-resize; user-select:none; -webkit-user-select:none; }
+  .fdr:focus-visible { outline:3px solid var(--go); outline-offset:2px; }
+  .fdr-track, .fdr-fill { position:absolute; left:50%; width:6px; transform:translateX(-50%); border-radius:3px; }
+  .fdr-track { top:14px; bottom:14px; background:#2a3038; }
+  .fdr-fill { bottom:14px; background:var(--sc); }
+  .fdr-ticks { position:absolute; top:14px; bottom:14px; left:0; right:0; pointer-events:none; }
+  .fdr-ticks span { position:absolute; left:6px; font-size:10px; color:#9aa3ad; transform:translateY(50%); }
+  .fdr-cap { position:absolute; left:50%; width:56px; height:30px; transform:translate(-50%, 50%); background:#eef1f4;
+    border:2px solid #000; border-radius:7px; box-shadow:0 2px 0 #000; }
+  .fdr-cap::after { content:""; position:absolute; left:6px; right:6px; top:50%; height:3px; margin-top:-1px; background:#000; }
+  .fdr.dim .fdr-cap { background:#6b737d; }
+  .fdr.dim .fdr-fill { opacity:.35; }
+  .sst .stp-v { min-height:48px; font-size:17px; }
+  .sst-modes { display:flex; gap:4px; }
+  .sst-modes .big { flex:1; min-width:0; padding:0 2px; font-size:13px; }
+  .sst-modes .big.on { background:#fff; border-color:#fff; color:#000; }
+  .big.ghost.on { background:#fff; border-color:#fff; color:#000; }
   @media (max-width:560px) {
+    /* Celular: cada grupo vira uma fileira de faders com rolagem horizontal, como numa mesa. */
+    .snd-grid { grid-auto-flow:column; grid-auto-columns:128px; grid-template-columns:none; overflow-x:auto;
+      padding-bottom:6px; scroll-snap-type:x proximity; }
+    .sst { scroll-snap-align:start; }
+    .fdr { height:200px; }
     .eq-bands { grid-template-columns:repeat(3, minmax(0, 1fr)); }
     .stp { grid-template-columns:5.6em 48px minmax(0, 1fr) 48px; }
     .stp-l { font-size:14px; }
@@ -207,9 +244,26 @@
     <div class="eq-card" id="eq-lpf"></div>
   </div>
   <div class="eq-status" id="eq-status" role="status" aria-live="polite">
-    <div class="eq-status-main" id="eq-status-main"></div>
-    <div class="eq-status-cmd" id="eq-status-cmd"></div>
-    <div class="eq-status-risk" id="eq-status-risk"></div>
+    <div class="eq-status-main"></div><div class="eq-status-cmd"></div><div class="eq-status-risk"></div>
+  </div>
+</section>
+<section id="sends" hidden aria-label="Envios para um bus ou matriz">
+  <div class="snd-dests">
+    <span class="snd-row-l">Buses</span><div class="eq-chips" id="snd-bus" aria-label="Escolher bus"></div>
+    <span class="snd-row-l">Matrizes</span><div class="eq-chips" id="snd-mtx" aria-label="Escolher matriz"></div>
+  </div>
+  <div class="eq-head">
+    <div class="eq-id"><span class="eq-chnum" id="snd-title"></span><span class="eq-chname">envios</span></div>
+    <div class="eq-headbtns">
+      <button type="button" class="big ghost" id="snd-filter"></button>
+      <button type="button" class="big ghost" id="snd-reload" title="Ler de novo da mesa">Reler</button>
+    </div>
+  </div>
+  <p class="eq-risk snd-head-risk" id="snd-risk"></p>
+  <div class="eq-msg" id="snd-msg"></div>
+  <div id="snd-groups"></div>
+  <div class="eq-status" id="snd-status" role="status" aria-live="polite">
+    <div class="eq-status-main"></div><div class="eq-status-cmd"></div><div class="eq-status-risk"></div>
   </div>
 </section>
 <div id="dlg" role="dialog" aria-modal="true">
@@ -535,6 +589,7 @@
   function render(st) {
     strips[st.kind][st.index - 1] = st;
     if (st.kind === "ch") updateChip(st);
+    onStripForSends(st);
     if (st.kind !== active) return;
     const c = card(st);
     if (!c.name.dataset.editing && c.name.value !== st.name && document.activeElement !== c.name) c.name.value = st.name;
@@ -564,16 +619,18 @@
     c.bars[1].style.setProperty("--h", pct(st.meter && st.meter.r) + "%");
   }
 
+  // Abas que não são grade de strips.
+  const PANELS = { eq: () => showEq(), sends: () => showSends() };
   function showTab(kind) {
-    if (kind !== "eq" && !info(kind)) kind = "ch";
+    if (!PANELS[kind] && !info(kind)) kind = "ch";
     active = kind;
     try { localStorage.setItem("wing-tab", kind); } catch {}
     document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.kind === kind));
-    const isEq = kind === "eq";
-    grid.hidden = isEq;
-    eqPanel.hidden = !isEq;
-    document.body.classList.toggle("eq-mode", isEq);
-    if (isEq) return showEq();
+    grid.hidden = !!PANELS[kind];
+    eqPanel.hidden = kind !== "eq";
+    sndPanel.hidden = kind !== "sends";
+    document.body.classList.toggle("panel-mode", !!PANELS[kind]);
+    if (PANELS[kind]) return PANELS[kind]();
     grid.replaceChildren();
     for (const st of strips[kind]) grid.appendChild(card(st).el);
     for (const st of strips[kind]) render(st);
@@ -590,12 +647,14 @@
       b.addEventListener("click", () => showTab(k.kind));
       nav.appendChild(b);
     }
-    const eqTab = document.createElement("button");
-    eqTab.type = "button";
-    eqTab.dataset.kind = "eq";
-    eqTab.textContent = "EQ";
-    eqTab.addEventListener("click", () => showTab("eq"));
-    nav.appendChild(eqTab);
+    for (const [kind, text] of [["eq", "EQ"], ["sends", "Sends"]]) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.dataset.kind = kind;
+      b.textContent = text;
+      b.addEventListener("click", () => showTab(kind));
+      nav.appendChild(b);
+    }
   }
 
   // ---------- painel de EQ ----------
@@ -769,8 +828,10 @@
     if (drag.filter) setPending("flt", drag.key + "f", xf(p.x));
     else { setPending("eq", drag.key + "f", xf(p.x)); setPending("eq", drag.key + "g", yd(p.y)); }
     renderEq();
+    eqWriter.preview();
   });
   const endDrag = (e) => { if (drag && e.pointerId === drag.id) { drag = null; sendEq(); } };
+  const sendEq = () => eqWriter.flush();
   svg.addEventListener("pointerup", endDrag);
   svg.addEventListener("pointercancel", endDrag);
   // Roda do mouse sobre uma banda: Q.
@@ -782,6 +843,7 @@
     const q = eqVal("eq", hit.key + "q");
     if (typeof q === "number") setPending("eq", hit.key + "q", q * (e.deltaY < 0 ? 1.06 : 1 / 1.06));
     renderEq();
+    eqWriter.preview();
     // Envia quando a roda para (um comando com o Q final, não um por passo da roda).
     clearTimeout(wheelTimer);
     wheelTimer = setTimeout(sendEq, 400);
@@ -924,7 +986,7 @@
     }
     controls.push(onOff(document.getElementById("eq-on"), "eq", "on", "EQ"));
     document.getElementById("eq-reload").addEventListener("click", () => {
-      if (sending) return toast("Aguarde o envio terminar.", true);
+      if (eqWriter.sending) return toast("Aguarde o envio terminar.", true);
       pending.clear();
       loadEq(eqCh);
     });
@@ -962,9 +1024,9 @@
 
   function selectEqChannel(ch) {
     if (ch === eqCh && eqData) return;
-    if (sending || drag) return toast("Aguarde o envio terminar.", true);
+    if (eqWriter.sending || drag) return toast("Aguarde o envio terminar.", true);
     pending.clear();
-    hideEqStatus();
+    eqStatus.hide();
     eqData = null;
     eqCh = ch;
     try { localStorage.setItem("wing-eq-ch", String(ch)); } catch {}
@@ -1084,66 +1146,476 @@
     return String(v);
   }
 
-  let sending = false;
-  let sendAgain = false;
-  let statusTimer = null;
-  function showEqStatus(kind, main, cmds, risks) {
-    document.getElementById("eq-status").className = `eq-status show ${kind}`;
-    document.getElementById("eq-status-main").textContent = main;
-    // Os últimos comandos enviados, exatamente como saíram para a mesa.
-    document.getElementById("eq-status-cmd").textContent = cmds.slice(-4).join("\n");
-    document.getElementById("eq-status-risk").textContent = [...risks].map((r) => "⚠ " + r).join(" ");
-    clearTimeout(statusTimer);
-    if (kind === "ok") statusTimer = setTimeout(hideEqStatus, 8000);
-  }
-  function hideEqStatus() {
-    clearTimeout(statusTimer);
-    document.getElementById("eq-status").className = "eq-status";
+  // Comando como a mesa vai receber (mesmo formato que o servidor devolve em "command").
+  const oscText = (path, tag, v) => `${path} ,${tag} ${tag === "s" ? JSON.stringify(v) : v}`;
+  const eqTag = (d) => !d ? "f" : d.type === "int" ? "i" : d.type === "list" || d.type === "string" ? "s" : "f";
+  const eqKey = (k) => { const [sec, p] = k.split("/"); return { sec, p, d: eqDesc(sec, p) }; };
+  const eqStatus = statusBar(document.getElementById("eq-status"));
+  const eqWriter = writer({
+    pending, status: eqStatus, render: renderEq,
+    canSend: canEditEq, held: () => !!drag,
+    context: () => `CH ${eqCh}`,
+    label: (k) => { const { sec, p } = eqKey(k); return eqLabel(sec, p); },
+    command: (k, v) => { const { sec, p, d } = eqKey(k); return oscText(`/ch/${eqCh}/${sec}/${p}`, eqTag(d), v); },
+    risk: (k) => { const { d } = eqKey(k); return d && d.risk; },
+    extraRisk: (k, v) => {
+      const { sec, p } = eqKey(k), cur = eqCur(sec, p);
+      return /^[lh1-4]g$/.test(p) && typeof cur === "number" && v > cur + 6 ? `Reforço de mais de 6 dB em ${eqLabel(sec, p)}.` : null;
+    },
+    post: (k, v) => { const { sec, p } = eqKey(k); return postJson(`/api/channels/${eqCh}/${sec}`, { param: p, value: v }); },
+    apply: (k, readBack) => { const { d } = eqKey(k); if (d) applyEqValue(d, readBack); },
+  });
+
+  // ---------- envio direto (EQ e sends) ----------
+  // Sem etapa de confirmação (pedido do usuário enquanto não está ao vivo). Antes de enviar a
+  // barra de status mostra o comando OSC exato e o aviso de risco; cada comando é validado pela
+  // rota na descrição da mesa, enviado um por vez e lido de volta.
+  function statusBar(root) {
+    let timer = null;
+    const part = (c) => root.querySelector(c);
+    const bar = {
+      show(kind, main, cmds = [], risks = new Set()) {
+        root.className = `eq-status show ${kind}`;
+        part(".eq-status-main").textContent = main;
+        part(".eq-status-cmd").textContent = cmds.slice(-4).join("\n");
+        part(".eq-status-risk").textContent = [...risks].filter(Boolean).map((r) => "⚠ " + r).join(" ");
+        clearTimeout(timer);
+        if (kind === "ok") timer = setTimeout(bar.hide, 8000);
+      },
+      hide() { clearTimeout(timer); root.className = "eq-status"; },
+    };
+    return bar;
   }
 
   /**
-   * Envia o que está pendente, um comando por vez: a rota valida na descrição da mesa,
-   * escreve e lê de volta. Para no primeiro problema e volta a mostrar o que está na mesa.
+   * Fila de envio de um painel. o: { pending (Map chave -> valor), status, render(), canSend(),
+   * held() (arrastando: espera soltar), context(), label(k), command(k, v), risk(k),
+   * extraRisk(k, v), post(k, v) -> postJson, apply(k, readBack) }.
+   * Envia um por vez; para no primeiro problema e volta a mostrar o que está na mesa.
    */
-  async function sendEq() {
-    if (!canEditEq() || drag) return;
-    if (sending) { sendAgain = true; return; }
-    sending = true;
-    const ch = eqCh, cmds = [], risks = new Set();
-    let error = null;
-    try {
-      do {
-        sendAgain = false;
-        for (const [key, value] of [...pending]) {
-          const [sec, param] = key.split("/");
-          const cur = eqCur(sec, param);
-          showEqStatus("sending", `Enviando ${eqLabel(sec, param)}: ${eqFmt(param, value)}…`, cmds, risks);
-          const r = await postJson(`/api/channels/${ch}/${sec}`, { param, value });
-          if (r.error) { error = `${eqLabel(sec, param)}: ${r.error}`; break; }
-          cmds.push(r.data.command);
-          if (r.data.risk) risks.add(r.data.risk);
-          if (/^[lh1-4]g$/.test(param) && typeof cur === "number" && value > cur + 6) {
-            risks.add(`Reforço de mais de 6 dB em ${eqLabel(sec, param)}.`);
-          }
-          const d = eqDesc(sec, param);
-          if (d) applyEqValue(d, r.data.readBack);
-          if (pending.get(key) === value) pending.delete(key);
-          renderEq();
-          if (!r.data.ok) { error = `A mesa não confirmou ${r.data.path} (lido: ${r.data.readBack.text}).`; break; }
+  function writer(o) {
+    let sending = false, again = false;
+    const risksOf = (items) => new Set(items.flatMap(([k, v]) => [o.risk(k), o.extraRisk(k, v)]).filter(Boolean));
+    return {
+      get sending() { return sending; },
+      /** Mostra, antes de enviar, os comandos que vão sair (ex.: durante o arraste). */
+      preview() {
+        const items = [...o.pending];
+        if (!items.length || sending) return;
+        o.status.show("sending", "Ao soltar, envia:", items.map(([k, v]) => o.command(k, v)), risksOf(items));
+      },
+      async flush() {
+        if (!o.canSend() || o.held()) return;
+        if (sending) { again = true; return; }
+        sending = true;
+        const cmds = [], risks = new Set();
+        let error = null;
+        try {
+          do {
+            again = false;
+            for (const [key, value] of [...o.pending]) {
+              for (const r of risksOf([[key, value]])) risks.add(r);
+              o.status.show("sending", `Enviando ${o.label(key)}:`, [...cmds, o.command(key, value)], risks);
+              const r = await o.post(key, value);
+              if (r.error) { error = `${o.label(key)}: ${r.error}`; break; }
+              cmds.push(r.data.command);
+              if (r.data.risk) risks.add(r.data.risk);
+              o.apply(key, r.data.readBack);
+              if (o.pending.get(key) === value) o.pending.delete(key);
+              o.render();
+              if (!r.data.ok) { error = `A mesa não confirmou ${r.data.path} (lido: ${r.data.readBack.text}).`; break; }
+            }
+          } while (again && !error && !o.held());
+        } finally {
+          sending = false;
         }
-      } while (sendAgain && !error && !drag);
-    } finally {
-      sending = false;
+        if (error) {
+          o.pending.clear();
+          o.render();
+          o.status.show("err", `${error.replace(/\.?$/, ".")} Nada mais foi enviado.`, cmds, risks);
+        } else if (cmds.length) {
+          const n = cmds.length === 1 ? "1 comando enviado e confirmado" : `${cmds.length} comandos enviados e confirmados`;
+          o.status.show(risks.size ? "risk" : "ok", `${o.context()}: ${n} pela mesa (leitura de volta).`, cmds, risks);
+        }
+      },
+    };
+  }
+
+  // ---------- visão de sends ----------
+  // Escolhe um destino (bus ou matriz) e cada fonte vira um fader com o nível do envio para
+  // ele, on/off e pré/pós. Como no EQ, as mudanças vão direto, sem etapa de confirmação.
+  const sndPanel = document.getElementById("sends");
+  const SRC_GROUPS = { bus: ["ch", "aux"], mtx: ["ch", "aux", "bus", "main"] };
+  const SRC_LABEL = { ch: "Canais", aux: "Aux", bus: "Buses", main: "Mains" };
+  const PARAM_LABEL = { on: "on/off", lvl: "nível", mode: "pré/pós", pre: "pré/pós" };
+  const DEST_RE = /^(bus\/([1-9]|1[0-6])|mtx\/[1-8])$/;
+  let sndDest = "bus/1";
+  try { sndDest = localStorage.getItem("wing-snd-dest") || "bus/1"; } catch {}
+  // Link direto: http://localhost:3000/#sends/bus/3
+  const sndHash = /^#sends(?:\/(\w+\/\d+))?$/.exec(location.hash);
+  if (sndHash) { active = "sends"; if (sndHash[1]) sndDest = sndHash[1]; }
+  if (!DEST_RE.test(sndDest)) sndDest = "bus/1";
+  let sndRows = null, sndError = null, sndToken = 0, sndRisk = "", sndOnlyOn = false;
+  try { sndOnlyOn = localStorage.getItem("wing-snd-only-on") === "1"; } catch {}
+  const sPending = new Map(); // "ch/5/lvl" -> valor
+  const sStrips = new Map(); // "ch/5" -> { row, el, update() }
+  const destChips = {};
+  let fdrDrag = null;
+
+  const destOf = (d = sndDest) => { const [kind, n] = d.split("/"); return { kind, index: Number(n) }; };
+  const destKeyOf = (d = sndDest) => { const x = destOf(d); return x.kind === "bus" ? String(x.index) : `MX${x.index}`; };
+  function destLabel(d = sndDest) {
+    const x = destOf(d), st = strips[x.kind] && strips[x.kind][x.index - 1];
+    return `${x.kind === "bus" ? "BUS" : "MTX"} ${x.index}${st && st.name ? " · " + st.name : ""}`;
+  }
+  const modeParamOf = (kind) => (kind === "ch" || kind === "aux" ? "mode" : "pre");
+  const canEditSends = () => writable() && !!sndRows;
+  const fmtLvl = (v) => (v <= -144 ? "-∞" : (v > 0 ? "+" : "") + v.toFixed(1));
+
+  // Lei de fader aproximada (estilo X32/WING): posição 0..1 <-> dB. 0,5 = -10 dB, 1 = +10 dB.
+  function dbToPos(db) {
+    if (db == null || db <= -144) return 0;
+    if (db >= -10) return Math.min(1, (db + 30) / 40);
+    if (db >= -30) return (db + 50) / 80;
+    if (db >= -60) return (db + 70) / 160;
+    return Math.max(0, (db + 90) / 480);
+  }
+  function posToDb(p) {
+    if (p <= 0.002) return -144;
+    const db = p >= 0.5 ? p * 40 - 30 : p >= 0.25 ? p * 80 - 50 : p >= 0.0625 ? p * 160 - 70 : p * 480 - 90;
+    return Math.round(db * 10) / 10;
+  }
+
+  /** Valor na mesa (sem o pendente) de um parâmetro de envio da linha. */
+  function rowCurrent(row, param) {
+    if (param === "on") return row.on == null ? null : row.on ? 1 : 0;
+    if (param === "lvl") return row.lvl;
+    if (param === "mode") return row.mode;
+    return row.mode == null ? null : row.mode === "PRE" ? 1 : 0; // pre
+  }
+  const rowKey = (row, param) => `${row.kind}/${row.index}/${param}`;
+  const rowValue = (row, param) => sPending.has(rowKey(row, param)) ? sPending.get(rowKey(row, param)) : rowCurrent(row, param);
+  /** Modo mostrado (PRE/POST/GRP), com o pendente. */
+  function rowMode(row) {
+    const mp = modeParamOf(row.kind), v = rowValue(row, mp);
+    return mp === "mode" ? v : v == null ? null : v === 1 ? "PRE" : "POST";
+  }
+  /** Valor vindo da mesa (leitura de volta ou evento da assinatura). */
+  function applySendRow(row, param, v) {
+    if (param === "on" && v.kind !== "string") row.on = v.value === 1;
+    if (param === "lvl" && v.kind !== "string") row.lvl = v.value;
+    if (param === "mode" && v.kind === "string") row.mode = v.text;
+    if (param === "pre" && v.kind !== "string") row.mode = v.value === 1 ? "PRE" : "POST";
+  }
+  function setSendPending(row, param, v) {
+    if (!canEditSends() || v == null || (typeof v === "number" && !Number.isFinite(v))) return;
+    if (param === "lvl") v = Math.round(clamp(v, -144, 10) * 10) / 10;
+    const k = rowKey(row, param), cur = rowCurrent(row, param);
+    if (v === cur) sPending.delete(k);
+    else sPending.set(k, v);
+  }
+
+  const sndStatus = statusBar(document.getElementById("snd-status"));
+  const sKey = (k) => { const [kind, n, param] = k.split("/"); return { kind, index: Number(n), param, s: sStrips.get(`${kind}/${n}`) }; };
+  const sndWriter = writer({
+    pending: sPending, status: sndStatus,
+    render: () => sStrips.forEach((x) => x.update()),
+    canSend: canEditSends, held: () => !!fdrDrag,
+    context: () => destLabel(),
+    label: (k) => { const x = sKey(k); return `${PREFIX[x.kind]} ${x.index} → ${destLabel()} · ${PARAM_LABEL[x.param]}`; },
+    command: (k, v) => {
+      const x = sKey(k);
+      return oscText(`/${x.kind}/${x.index}/send/${destKeyOf()}/${x.param}`, x.param === "lvl" ? "f" : x.param === "mode" ? "s" : "i", v);
+    },
+    risk: () => sndRisk,
+    extraRisk: (k, v) => {
+      const x = sKey(k), cur = x.s && x.s.row.lvl;
+      return x.param === "lvl" && typeof cur === "number" && v > Math.max(cur, -60) + 6
+        ? `Aumento de mais de 6 dB no envio de ${PREFIX[x.kind]} ${x.index}.` : null;
+    },
+    post: (k, v) => { const x = sKey(k); return postJson("/api/sends", { src: `${x.kind}/${x.index}`, dest: sndDest, param: x.param, value: v }); },
+    apply: (k, readBack) => { const x = sKey(k); if (x.s) applySendRow(x.s.row, x.param, readBack); },
+  });
+
+  let sndKeyTimer = null;
+  /** Envia depois de uma pausa (teclado e roda: um comando com o valor final). */
+  function sendSoon() { clearTimeout(sndKeyTimer); sndKeyTimer = setTimeout(() => sndWriter.flush(), 450); }
+
+  /** Um fader de envio: fonte -> destino escolhido. */
+  function sendStrip(row) {
+    const el = document.createElement("div");
+    el.className = "sst";
+    const mp = modeParamOf(row.kind);
+    const modes = mp === "mode" ? ["PRE", "POST", "GRP"] : ["PRE", "POST"];
+    const ticks = [[10, "+10"], [0, "0"], [-10, "-10"], [-30, "-30"], [-60, "-60"], [-144, "-∞"]]
+      .map(([db, t]) => `<span style="bottom:${(dbToPos(db) * 100).toFixed(2)}%">${t}</span>`).join("");
+    el.innerHTML = `<div class="sst-id"></div><div class="sst-name"></div>
+      <button type="button" class="big toggle sst-on"></button>
+      <div class="fdr" tabindex="0" role="slider" aria-valuemin="-144" aria-valuemax="10">
+        <div class="fdr-track"></div><div class="fdr-fill"></div><div class="fdr-ticks">${ticks}</div><div class="fdr-cap"></div></div>
+      <input class="stp-v sst-v" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Nível do envio em dB">
+      <div class="sst-modes"></div>`;
+    const q = (c) => el.querySelector(c);
+    const fdr = q(".fdr"), cap = q(".fdr-cap"), fill = q(".fdr-fill"), input = q(".sst-v"), onBtn = q(".sst-on");
+    const name = () => `${PREFIX[row.kind]} ${row.index}`;
+    fdr.setAttribute("aria-label", `Envio de ${name()}`);
+    const modeBtns = modes.map((m) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "big";
+      b.textContent = m;
+      b.addEventListener("click", () => { setSendPending(row, mp, mp === "mode" ? m : m === "PRE" ? 1 : 0); update(); sndWriter.flush(); });
+      q(".sst-modes").appendChild(b);
+      return [m, b];
+    });
+    onBtn.addEventListener("click", () => {
+      const v = rowValue(row, "on");
+      if (v === 0 || v === 1) { setSendPending(row, "on", v ? 0 : 1); update(); sndWriter.flush(); }
+    });
+
+    // Arrastar é relativo (tocar sem mover não muda nada); Shift = ajuste fino.
+    fdr.addEventListener("pointerdown", (e) => {
+      const v = rowValue(row, "lvl");
+      if (!canEditSends() || typeof v !== "number") return;
+      e.preventDefault();
+      try { fdr.setPointerCapture(e.pointerId); } catch {}
+      fdr.focus({ preventScroll: true });
+      fdrDrag = { id: e.pointerId, row, y0: e.clientY, p0: dbToPos(v), h: fdr.clientHeight - 28 };
+    });
+    fdr.addEventListener("pointermove", (e) => {
+      if (!fdrDrag || fdrDrag.id !== e.pointerId || fdrDrag.row !== row) return;
+      const p = clamp(fdrDrag.p0 - ((e.clientY - fdrDrag.y0) / fdrDrag.h) * (e.shiftKey ? 0.25 : 1), 0, 1);
+      setSendPending(row, "lvl", posToDb(p));
+      update();
+      sndWriter.preview();
+    });
+    const endDrag = (e) => {
+      if (!fdrDrag || fdrDrag.id !== e.pointerId || fdrDrag.row !== row) return;
+      fdrDrag = null;
+      sndWriter.flush();
+    };
+    fdr.addEventListener("pointerup", endDrag);
+    fdr.addEventListener("pointercancel", endDrag);
+    const nudge = (step) => {
+      const v = rowValue(row, "lvl");
+      if (!canEditSends() || typeof v !== "number") return;
+      let next = v <= -144 ? (step > 0 ? -60 : -144) : v + step;
+      if (next < -90) next = -144;
+      setSendPending(row, "lvl", next);
+      update();
+      sndWriter.preview();
+      sendSoon();
+    };
+    fdr.addEventListener("keydown", (e) => {
+      const step = { ArrowUp: 1, ArrowDown: -1, PageUp: 6, PageDown: -6 }[e.key];
+      if (!step) return;
+      e.preventDefault();
+      nudge(e.shiftKey ? step / 10 : step);
+    });
+    fdr.addEventListener("wheel", (e) => { if (!canEditSends()) return; e.preventDefault(); nudge(e.deltaY < 0 ? 0.5 : -0.5); }, { passive: false });
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+      if (e.key === "Escape") { input.value = fmtLvl(rowValue(row, "lvl")); input.blur(); }
+    });
+    input.addEventListener("blur", () => {
+      const v = rowValue(row, "lvl");
+      if (typeof v !== "number" || input.value === fmtLvl(v)) return;
+      const db = parseDb(input.value);
+      if (Number.isNaN(db) || db < -144 || db > 10) {
+        toast(`${name()}: digite um nível de -∞ (-inf) a +10 dB`, true);
+        input.value = fmtLvl(v);
+        return;
+      }
+      setSendPending(row, "lvl", db);
+      update();
+      sndWriter.flush();
+    });
+
+    function update() {
+      const st = strips[row.kind] && strips[row.kind][row.index - 1];
+      const color = chColor(st);
+      el.style.setProperty("--sc", color);
+      el.style.setProperty("--cc", color);
+      el.style.setProperty("--cc-ink", inkOn(color));
+      q(".sst-id").textContent = name();
+      q(".sst-name").textContent = st && st.name ? st.name : "—";
+      const lvl = rowValue(row, "lvl"), on = rowValue(row, "on"), mode = rowMode(row), en = canEditSends();
+      const p = dbToPos(typeof lvl === "number" ? lvl : -144);
+      cap.style.bottom = `calc(14px + ${p} * (100% - 28px))`;
+      fill.style.height = `calc(${p} * (100% - 28px))`;
+      fdr.setAttribute("aria-valuenow", typeof lvl === "number" ? String(lvl) : "");
+      fdr.setAttribute("aria-valuetext", typeof lvl === "number" ? fmtDb(lvl) : "sem leitura");
+      fdr.classList.toggle("dim", on !== 1);
+      fdr.style.cursor = en ? "" : "default";
+      if (document.activeElement !== input) input.value = typeof lvl === "number" ? fmtLvl(lvl) : "—";
+      input.readOnly = !en || typeof lvl !== "number";
+      onBtn.textContent = on === 1 ? "ON" : on === 0 ? "OFF" : "—";
+      onBtn.classList.toggle("on", on === 1);
+      onBtn.setAttribute("aria-pressed", String(on === 1));
+      onBtn.disabled = !en || on == null;
+      for (const [m, b] of modeBtns) {
+        b.classList.toggle("on", mode === m);
+        b.setAttribute("aria-pressed", String(mode === m));
+        b.disabled = !en || mode == null;
+      }
+      const changed = ["on", "lvl", mp].some((x) => sPending.has(rowKey(row, x)));
+      el.classList.toggle("changed", changed);
+      el.hidden = sndOnlyOn && on !== 1 && !changed && !(fdrDrag && fdrDrag.row === row);
     }
-    if (error) {
-      pending.clear();
-      renderEq();
-      showEqStatus("err", `${error.replace(/\.?$/, ".")} Nada mais foi enviado.`, cmds, risks);
-    } else if (cmds.length) {
-      const n = cmds.length === 1 ? "1 comando enviado e confirmado" : `${cmds.length} comandos enviados e confirmados`;
-      showEqStatus(risks.size ? "risk" : "ok", `CH ${ch}: ${n} pela mesa (leitura de volta).`, cmds, risks);
+    return { row, el, update };
+  }
+
+  function buildDestChips() {
+    for (const [kind, count] of [["bus", 16], ["mtx", 8]]) {
+      const box = document.getElementById(`snd-${kind}`);
+      if (box.childElementCount) continue;
+      for (let i = 1; i <= count; i++) {
+        const d = `${kind}/${i}`;
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "big chip";
+        b.innerHTML = `<b></b><span></span>`;
+        b.addEventListener("click", () => selectSendDest(d));
+        box.appendChild(b);
+        destChips[d] = b;
+      }
+    }
+    Object.keys(destChips).forEach(updateDestChip);
+  }
+  function updateDestChip(d) {
+    const b = destChips[d];
+    if (!b) return;
+    const x = destOf(d), st = strips[x.kind] && strips[x.kind][x.index - 1], color = chColor(st);
+    b.style.setProperty("--chip", color);
+    b.style.setProperty("--chip-ink", inkOn(color));
+    b.querySelector("b").textContent = `${x.kind === "bus" ? "BUS" : "MTX"} ${x.index}`;
+    b.querySelector("span").textContent = st && st.name ? st.name : "—";
+    b.classList.toggle("sel", d === sndDest);
+    b.setAttribute("aria-pressed", String(d === sndDest));
+  }
+  function scrollToDest() {
+    const b = destChips[sndDest];
+    if (!b) return;
+    const box = b.parentElement;
+    box.scrollLeft = b.offsetLeft - box.offsetLeft - (box.clientWidth - b.offsetWidth) / 2;
+  }
+
+  /** Mudou nome/cor de um strip: atualiza fader e escolha de destino. */
+  function onStripForSends(st) {
+    if (st.kind === "bus" || st.kind === "mtx") updateDestChip(`${st.kind}/${st.index}`);
+    if (active !== "sends") return;
+    const s = sStrips.get(`${st.kind}/${st.index}`);
+    if (s) s.update();
+    if (`${st.kind}/${st.index}` === sndDest) renderSendsHead();
+  }
+
+  const SEND_EVENT = /^\/(ch|aux|bus|main)\/(\d+)\/send\/(\d+|MX\d+)\/(on|lvl|mode|pre)$/;
+  function onSendParam(path, value) {
+    const m = SEND_EVENT.exec(path);
+    if (!m || !sndRows || m[3] !== destKeyOf()) return;
+    const s = sStrips.get(`${m[1]}/${m[2]}`);
+    if (!s) return;
+    applySendRow(s.row, m[4], value);
+    const k = rowKey(s.row, m[4]);
+    if (sPending.has(k) && sPending.get(k) === rowCurrent(s.row, m[4])) sPending.delete(k);
+    if (active === "sends") s.update();
+  }
+
+  function selectSendDest(d) {
+    if (d === sndDest && sndRows) return;
+    if (sndWriter.sending || fdrDrag) return toast("Aguarde o envio terminar.", true);
+    sPending.clear();
+    sndStatus.hide();
+    sndDest = d;
+    try { localStorage.setItem("wing-snd-dest", d); } catch {}
+    Object.keys(destChips).forEach(updateDestChip);
+    scrollToDest();
+    loadSends();
+  }
+  function showSends() {
+    buildDestChips();
+    scrollToDest();
+    if (!sPending.size || !sndRows) loadSends();
+    else renderSends();
+  }
+
+  async function loadSends() {
+    const token = ++sndToken, dest = sndDest;
+    sndError = null;
+    sndRows = null;
+    buildSendStrips();
+    renderSends();
+    try {
+      const [res, risk] = await Promise.all([fetch(`/api/sends?dest=${dest}`), riskFor(`/ch/1/send/${destKeyOf(dest)}/lvl`)]);
+      const data = await res.json();
+      if (token !== sndToken) return;
+      if (!res.ok) throw new Error(data.error);
+      sndRows = data.rows;
+      sndRisk = risk;
+    } catch (e) {
+      if (token !== sndToken) return;
+      sndError = "Não foi possível ler os envios da mesa: " + e.message;
+    }
+    buildSendStrips();
+    renderSends();
+  }
+
+  function buildSendStrips() {
+    const box = document.getElementById("snd-groups");
+    box.replaceChildren();
+    sStrips.clear();
+    if (!sndRows) return;
+    for (const kind of SRC_GROUPS[destOf().kind]) {
+      const sec = document.createElement("div");
+      sec.className = "snd-group";
+      sec.innerHTML = `<h3></h3><div class="snd-grid"></div>`;
+      sec.querySelector("h3").textContent = SRC_LABEL[kind];
+      for (const row of sndRows.filter((r) => r.kind === kind)) {
+        const s = sendStrip(row);
+        sStrips.set(`${row.kind}/${row.index}`, s);
+        sec.querySelector(".snd-grid").appendChild(s.el);
+      }
+      box.appendChild(sec);
     }
   }
+
+  function renderSendsHead() {
+    const x = destOf(), st = strips[x.kind] && strips[x.kind][x.index - 1], color = chColor(st);
+    sndPanel.style.setProperty("--cc", color);
+    sndPanel.style.setProperty("--cc-ink", inkOn(color));
+    document.getElementById("snd-title").textContent = destLabel();
+  }
+
+  function renderSends() {
+    if (sndPanel.hidden) return;
+    buildDestChips();
+    renderSendsHead();
+    const msg = document.getElementById("snd-msg");
+    msg.textContent = sndError ? sndError : !sndRows ? `Lendo os envios para ${destLabel()} na mesa…`
+      : !writable() ? "Somente leitura: dá para ver os envios, mas mudanças pedem WING_ALLOW_WRITES=1." : "";
+    msg.classList.toggle("err", !!sndError);
+    // Aviso de risco sempre visível: não há confirmação antes de enviar.
+    document.getElementById("snd-risk").textContent = sndRows && sndRisk && writable() ? "⚠ " + sndRisk : "";
+    const filter = document.getElementById("snd-filter");
+    filter.textContent = sndOnlyOn ? "Só ligados" : "Todos";
+    filter.title = sndOnlyOn ? "Mostrando só envios ligados (toque para mostrar todos)" : "Mostrando todos (toque para só ligados)";
+    filter.classList.toggle("on", sndOnlyOn);
+    filter.setAttribute("aria-pressed", String(sndOnlyOn));
+    sStrips.forEach((s) => s.update());
+  }
+
+  document.getElementById("snd-filter").addEventListener("click", () => {
+    sndOnlyOn = !sndOnlyOn;
+    try { localStorage.setItem("wing-snd-only-on", sndOnlyOn ? "1" : "0"); } catch {}
+    renderSends();
+  });
+  document.getElementById("snd-reload").addEventListener("click", () => {
+    if (sndWriter.sending || fdrDrag) return toast("Aguarde o envio terminar.", true);
+    sPending.clear();
+    sndStatus.hide();
+    loadSends();
+  });
 
   // ---------- status ----------
   function renderStatus(s) {
@@ -1152,6 +1624,7 @@
     document.body.classList.toggle("writable", !!s.writesEnabled);
     if (wasWritable !== !!s.writesEnabled && strips[active]) strips[active].forEach(render);
     if (wasWritable !== !!s.writesEnabled && active === "eq") renderEq();
+    if (wasWritable !== !!s.writesEnabled && active === "sends") renderSends();
     const mode = document.getElementById("mode");
     mode.textContent = s.writesEnabled ? "Escrita liberada" : "Somente leitura";
     mode.className = "badge " + (s.writesEnabled ? "rw" : "ro");
@@ -1180,7 +1653,7 @@
     showTab(active);
   });
   es.addEventListener("strip", (e) => { if (kinds.length) render(JSON.parse(e.data)); });
-  es.addEventListener("param", (e) => { const p = JSON.parse(e.data); onEqParam(p.path, p.value); });
+  es.addEventListener("param", (e) => { const p = JSON.parse(e.data); onEqParam(p.path, p.value); onSendParam(p.path, p.value); });
   es.addEventListener("status", (e) => { lastStatus = JSON.parse(e.data); renderStatus(lastStatus); });
   es.addEventListener("meters", (e) => {
     const all = JSON.parse(e.data);

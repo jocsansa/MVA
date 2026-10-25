@@ -106,6 +106,7 @@ rota genérica (`POST /api/param`) é conferida contra essa descrição antes de
 | `GET /api/param?path=/ch/1/pan` | Lê um parâmetro |
 | `POST /api/param` `{path, value}` | Escreve um parâmetro (só com `WING_ALLOW_WRITES=1`) |
 | `GET /api/sends?dest=bus/1` | Envios de todas as fontes para um bus (ou `mtx/1..8`) |
+| `POST /api/sends` `{src, dest, param, value}` | Escreve um parâmetro de envio (veja "Sends" abaixo) |
 
 Envios: canais e aux mandam para buses 1–16 e matrizes MX1–MX8 (`on`, `lvl`, `mode`
 PRE/POST/GRP); buses e mains mandam só para as matrizes e usam `pre` (0/1) no lugar
@@ -127,8 +128,8 @@ os avisos de risco; o aviso do passa-alta fica sempre visível no painel. O pain
 o EQ modelo STD (outros modelos têm outros parâmetros).
 
 **Confirmação removida (temporário):** a etapa de confirmação antes de enviar foi removida
-do painel de EQ e do fluxo por chat a pedido do usuário, enquanto ele não está usando a
-mesa ao vivo. Validação, avisos de risco, leitura de volta e o padrão somente leitura
+do painel de EQ, da aba Sends e do fluxo por chat a pedido do usuário, enquanto ele não
+está usando a mesa ao vivo. Validação, avisos de risco, leitura de volta e o padrão somente leitura
 (escrita só com `WING_ALLOW_WRITES=1`) continuam. Para uso ao vivo, a confirmação pode
 ser recolocada: a rota já tem o `dryRun`, que devolve o comando exato sem escrever. Os
 outros controles da página (nome, mute, fader, pan, cor, ganho) continuam pedindo
@@ -154,6 +155,28 @@ confirmação.
 A resposta da escrita traz `ok` (leitura de volta confere, dentro de um passo da mesa),
 `command`, `risk` e `readBack`. Avisos: desligar o EQ, mexer no passa-alta e ganhos de EQ.
 
+### Sends
+
+Aba **Sends** (link direto `http://localhost:3000/#sends/bus/3` ou `#sends/mtx/2`): escolha
+um bus ou uma matriz e cada fonte vira um fader com o nível do envio para esse destino,
+com ON/OFF e PRE/POST/GRP (bus e main para matriz: só PRE/POST). Como no EQ, as mudanças
+vão direto, sem etapa de confirmação: ao soltar o fader (arrastar é relativo, tocar sem
+mover não muda nada; Shift = ajuste fino), ao tocar em ON/modo ou ao digitar o nível
+(`-inf` = -∞). Teclado no fader: setas ±1 dB, Page Up/Down ±6 dB. Enquanto arrasta, a
+barra do rodapé mostra o comando OSC exato que vai sair e os avisos; depois, o comando
+enviado e a leitura de volta. "Só ligados" esconde os envios desligados. No celular, cada
+grupo de fontes é uma fileira de faders com rolagem horizontal.
+
+`POST /api/sends` com `{src, dest, param, value, dryRun?}`: um parâmetro por pedido,
+validado na descrição do nó da mesa e lido de volta (com `dryRun` só valida e devolve o
+comando). A resposta tem `ok`, `command`, `risk` e `readBack`.
+
+| Campo | Valores |
+|---|---|
+| `dest` | `bus/1`..`bus/16`, `mtx/1`..`mtx/8` |
+| `src` | para bus: `ch/1..40`, `aux/1..8`; para matriz: também `bus/1..16`, `main/1..4` |
+| `param` | `lvl` (`,f` -144 = -∞ a +10 dB), `on` (`,i` 0/1); canal e aux: `mode` (`,s` `PRE`/`POST`/`GRP`); bus e main: `pre` (`,i` 1 = pré, 0 = pós) |
+
 ### Comandar pelo chat (Claude Code)
 
 As rotas acima são HTTP local, então o Claude Code pode operar a mesa a pedido no chat.
@@ -166,6 +189,9 @@ do usuário para prosseguir já cobre o envio.
 curl -s http://localhost:3000/api/channels/5/eq
 curl -s -H "content-type: application/json" -d '{"param":"1g","value":-3,"dryRun":true}' http://localhost:3000/api/channels/5/eq
 curl -s -H "content-type: application/json" -d '{"param":"1g","value":-3}' http://localhost:3000/api/channels/5/eq
+curl -s "http://localhost:3000/api/sends?dest=bus/3"
+curl -s -H "content-type: application/json" -d '{"src":"ch/5","dest":"bus/3","param":"lvl","value":-10,"dryRun":true}' http://localhost:3000/api/sends
+curl -s -H "content-type: application/json" -d '{"src":"ch/5","dest":"bus/3","param":"lvl","value":-10}' http://localhost:3000/api/sends
 ```
 
 A rota recusa pedidos com `Origin` de outro site e sem `content-type: application/json`.

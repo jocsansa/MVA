@@ -7,6 +7,7 @@
 
 import type { WingValue } from "./osc.ts";
 import type { StripKind } from "./strips.ts";
+import { writeParam, type ParamWriteResult, type WingClient } from "./wing.ts";
 
 export type SendDestKind = "bus" | "mtx";
 export interface SendDest {
@@ -88,6 +89,50 @@ export function applySendValue(row: SendRow, param: SendParam, value: WingValue 
   if (param === "mode") row.mode = value.text;
   // pre: 1 = PRE, 0 = POST (mostrado igual ao mode dos canais).
   if (param === "pre" && value.kind !== "string") row.mode = value.value === 1 ? "PRE" : "POST";
+}
+
+export interface SendSource {
+  kind: SendSourceKind;
+  index: number;
+}
+
+/** "ch/5" -> {ch, 5}, só se essa fonte manda para o tipo de destino (bus não manda para bus). */
+export function parseSendSource(text: string, dest: SendDest): SendSource | null {
+  const m = /^(ch|aux|bus|main)\/(\d+)$/.exec(text);
+  if (!m) return null;
+  const src = SEND_SOURCES[dest.kind].find((s) => s.kind === m[1]);
+  const index = Number(m[2]);
+  return src && index >= 1 && index <= src.count ? { kind: src.kind, index } : null;
+}
+
+/** Caminho de um parâmetro de envio, ou null se a fonte não usa esse parâmetro (mode x pre). */
+export function sendParamPath(src: SendSource, dest: SendDest, param: string): string | null {
+  if (!(sendParams(src.kind) as string[]).includes(param)) return null;
+  return `${sendBase(src.kind, src.index, dest)}/${param}`;
+}
+
+/**
+ * Escreve UM parâmetro de envio (nível, on/off, mode ou pre), ou só valida com dryRun.
+ * Tipo, faixa e opções vêm da descrição atual do nó na mesa; depois lê de volta.
+ */
+export async function writeSend(
+  wing: WingClient,
+  srcText: unknown,
+  destText: unknown,
+  param: unknown,
+  value: unknown,
+  dryRun = false,
+): Promise<ParamWriteResult> {
+  const dest = typeof destText === "string" ? parseDest(destText) : null;
+  if (!dest) throw new Error(`Destino inválido: ${String(destText)} (use bus/1..16 ou mtx/1..8)`);
+  const src = typeof srcText === "string" ? parseSendSource(srcText, dest) : null;
+  if (!src) {
+    const allowed = SEND_SOURCES[dest.kind].map((s) => `${s.kind}/1..${s.count}`).join(", ");
+    throw new Error(`Fonte inválida para ${destText}: ${String(srcText)} (aceitas: ${allowed})`);
+  }
+  const path = typeof param === "string" ? sendParamPath(src, dest, param) : null;
+  if (!path) throw new Error(`Parâmetro inválido para ${srcText}: ${String(param)} (aceitos: ${sendParams(src.kind).join(", ")})`);
+  return writeParam(wing, path, value, dryRun);
 }
 
 /** Monta as linhas do destino a partir das leituras. */

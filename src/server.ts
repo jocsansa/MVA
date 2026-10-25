@@ -15,7 +15,7 @@ import {
 import { isSafePath, readBackMatches, riskWarning } from "./schema.ts";
 import { EqRequestError, readChannelEq, writeChannelEq } from "./eq.ts";
 import { STRIP_KINDS } from "./strips.ts";
-import { buildSendRows, destKey, parseDest, sendPaths } from "./sends.ts";
+import { buildSendRows, destKey, parseDest, sendPaths, writeSend } from "./sends.ts";
 
 const host = process.env.CONSOLE_HOST;
 if (!host) {
@@ -84,6 +84,16 @@ async function handleWrite(req: http.IncomingMessage, res: http.ServerResponse, 
     if (typeof body.path !== "string" || !isSafePath(body.path)) return sendJson(res, 400, { error: "Caminho inválido" });
     const { readBack, desc } = await wing.setParam(body.path, body.value);
     return sendJson(res, 200, { ok: readBackMatches(desc, body.value, readBack), readBack });
+  }
+  if (url.pathname === "/api/sends") {
+    // Um parâmetro de envio por pedido: {src: "ch/5", dest: "bus/3", param: "lvl", value, dryRun?}.
+    const body = (await readJson(req)) as { src?: unknown; dest?: unknown; param?: unknown; value?: unknown; dryRun?: unknown };
+    try {
+      return sendJson(res, 200, await writeSend(wing, body.src, body.dest, body.param, body.value, body.dryRun === true));
+    } catch (e) {
+      const msg = (e as Error).message;
+      return sendJson(res, msg.startsWith("Sem resposta") ? 502 : 400, { error: msg });
+    }
   }
   const eq = EQ_WRITE_ROUTE.exec(url.pathname);
   if (eq) {
