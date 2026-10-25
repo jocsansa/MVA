@@ -90,5 +90,14 @@ Mudar o ganho de uma fonte muda todos os canais que usam essa fonte.
 
 ## Testado na mesa real (WING fw 3.1)
 
-Renomear, mutar/desmutar e fader, sempre um comando por vez e com confirmação.
-O firmware 3.1 responde ao `/?` no endereço `/*`.
+Renomear, mutar/desmutar, fader, pan, cor e solo, sempre um comando por vez, com
+confirmação, num canal sem entrada, e revertidos depois. Ganho ainda não foi testado na
+mesa real.
+
+Comportamentos do firmware 3.1 descobertos nos testes:
+
+- Responde ao `/?` no endereço `/*`.
+- Em respostas `,sfi` o inteiro é a posição na faixa (valor − mínimo); o valor real é o texto.
+- Um pedido de medidores novo substitui o anterior na mesma conexão.
+- Solo soma (ligar o solo de um canal não desliga o solo de outro strip).
+- Depois de reiniciar a mesa, o socket OSC antigo pode parar de receber respostas.
