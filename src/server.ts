@@ -7,13 +7,18 @@ import { fileURLToPath } from "node:url";
 import {
   FADER_MIN_DB,
   WingClient,
+  describeMessage,
+  gainAddress,
+  gainMessage,
   isValidChannel,
   validateChannelName,
   validateFader,
   validateGain,
+  writeParam,
 } from "./wing.ts";
-import { isSafePath, readBackMatches, riskWarning } from "./schema.ts";
+import { isSafePath, riskWarning } from "./schema.ts";
 import { EqRequestError, readChannelEq, writeChannelEq } from "./eq.ts";
+import { DynRequestError, readChannelDyn, writeChannelDyn } from "./dyn.ts";
 import { STRIP_KINDS } from "./strips.ts";
 import { buildSendRows, destKey, parseDest, sendPaths, writeSend } from "./sends.ts";
 
@@ -67,8 +72,13 @@ function snapshot() {
 
 const WRITE_ROUTE = /^\/api\/channels\/(\d+)\/(name|mute|fader|gain)$/;
 const SOURCE_ROUTE = /^\/api\/channels\/(\d+)\/source$/;
-const EQ_WRITE_ROUTE = /^\/api\/channels\/(\d+)\/(eq|flt)$/;
+// Escrita de um parâmetro por seção do canal: EQ, filtro, gate e compressor.
+const SECTION_WRITE_ROUTE = /^\/api\/channels\/(\d+)\/(eq|flt|gate|dyn)$/;
 const EQ_READ_ROUTE = /^\/api\/channels\/(\d+)\/eq$/;
+const DYN_READ_ROUTE = /^\/api\/channels\/(\d+)\/dyn$/;
+
+/** Mesa sem resposta: 502. Pedido inválido ou recusado pela descrição: 400. */
+const writeErrorCode = (msg: string) => (msg.startsWith("Sem resposta") ? 502 : 400);
 const curvePath = fileURLToPath(new URL("../public/eq-curve.js", import.meta.url));
 
 async function handleWrite(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<void> {
@@ -82,8 +92,12 @@ async function handleWrite(req: http.IncomingMessage, res: http.ServerResponse, 
   if (url.pathname === "/api/param") {
     const body = (await readJson(req)) as { path?: unknown; value?: unknown };
     if (typeof body.path !== "string" || !isSafePath(body.path)) return sendJson(res, 400, { error: "Caminho inválido" });
-    const { readBack, desc } = await wing.setParam(body.path, body.value);
-    return sendJson(res, 200, { ok: readBackMatches(desc, body.value, readBack), readBack });
+    try {
+      return sendJson(res, 200, await writeParam(wing, body.path, body.value));
+    } catch (e) {
+      const msg = (e as Error).message;
+      return sendJson(res, writeErrorCode(msg), { error: msg });
+    }
   }
   if (url.pathname === "/api/sends") {
     // Um parâmetro de envio por pedido: {src: "ch/5", dest: "bus/3", param: "lvl", value, dryRun?}.
@@ -92,19 +106,19 @@ async function handleWrite(req: http.IncomingMessage, res: http.ServerResponse, 
       return sendJson(res, 200, await writeSend(wing, body.src, body.dest, body.param, body.value, body.dryRun === true));
     } catch (e) {
       const msg = (e as Error).message;
-      return sendJson(res, msg.startsWith("Sem resposta") ? 502 : 400, { error: msg });
+      return sendJson(res, writeErrorCode(msg), { error: msg });
     }
   }
-  const eq = EQ_WRITE_ROUTE.exec(url.pathname);
-  if (eq) {
+  const sec = SECTION_WRITE_ROUTE.exec(url.pathname);
+  if (sec) {
     // Um parâmetro por pedido. dryRun: só valida na descrição da mesa e devolve o comando.
     const body = (await readJson(req)) as { param?: unknown; value?: unknown; dryRun?: unknown };
+    const write = sec[2] === "gate" || sec[2] === "dyn" ? writeChannelDyn : writeChannelEq;
     try {
-      return sendJson(res, 200, await writeChannelEq(wing, Number(eq[1]), eq[2]!, body.param, body.value, body.dryRun === true));
+      return sendJson(res, 200, await write(wing, Number(sec[1]), sec[2]!, body.param, body.value, body.dryRun === true));
     } catch (e) {
-      // Mesa sem resposta: 502. Pedido inválido ou recusado pela descrição: 400.
       const msg = (e as Error).message;
-      return sendJson(res, msg.startsWith("Sem resposta") ? 502 : 400, { error: msg });
+      return sendJson(res, writeErrorCode(msg), { error: msg });
     }
   }
   const m = WRITE_ROUTE.exec(url.pathname);
@@ -137,7 +151,10 @@ async function handleWrite(req: http.IncomingMessage, res: http.ServerResponse, 
   if (invalid) return sendJson(res, 400, { error: invalid });
   const { readBack, source } = await wing.setChannelGain(ch, db);
   // Pré locais andam em passos de 2,5 dB: a mesa arredonda para o passo mais próximo.
-  sendJson(res, 200, { ok: Math.abs(readBack - db) <= 1.25, readBack, source });
+  sendJson(res, 200, {
+    ok: Math.abs(readBack - db) <= 1.25, readBack, source,
+    command: describeMessage(gainMessage(source, db)), risk: riskWarning(gainAddress(source)!),
+  });
 }
 
 // Medidores chegam em alta taxa; repassa ao navegador no máximo ~15x por segundo.
@@ -215,6 +232,13 @@ const server = http.createServer(async (req, res) => {
   } else if (url.pathname === "/eq-curve.js") {
     res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
     res.end(await readFile(curvePath));
+  } else if (DYN_READ_ROUTE.test(url.pathname)) {
+    // Só leitura: gate e compressor do canal, com tudo o que a descrição da mesa traz.
+    try {
+      sendJson(res, 200, await readChannelDyn(wing, Number(DYN_READ_ROUTE.exec(url.pathname)![1])));
+    } catch (e) {
+      sendJson(res, e instanceof DynRequestError ? 400 : 502, { error: (e as Error).message });
+    }
   } else if (EQ_READ_ROUTE.test(url.pathname)) {
     // Só leitura: EQ e filtro do canal, com faixas e valores da descrição da mesa.
     try {

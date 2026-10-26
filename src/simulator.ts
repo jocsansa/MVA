@@ -65,6 +65,28 @@ const DEFS: Record<string, Def> = {
   tf: { type: "int", min: 0, max: 1 },
   "flt/mdl": { type: "list", options: ["TILT", "MAX", "AP1", "AP2"] },
   tilt: { type: "lin", min: -6, max: 6, unit: "dB", steps: 49, digits: 2 },
+  // Gate (/ch/N/gate) e compressor (/ch/N/dyn): estrutura PLAUSÍVEL, ainda não capturada da
+  // WING real (o painel monta os controles pela descrição, então se adapta ao que vier).
+  "gate/mdl": { type: "list", options: ["GATE", "DUCK"] },
+  "gate/thr": { type: "lin", min: -80, max: 0, unit: "dB", steps: 161, digits: 1 },
+  "gate/range": { type: "lin", min: 3, max: 60, unit: "dB", steps: 58, digits: 1 },
+  "gate/att": { type: "lin", min: 0, max: 120, unit: "ms", steps: 121, digits: 1 },
+  "gate/hld": { type: "log", min: 0.5, max: 2000, unit: "ms", steps: 101, digits: 1 },
+  "gate/rel": { type: "log", min: 4, max: 4000, unit: "ms", steps: 101, digits: 1 },
+  "gate/acc": { type: "lin", min: 0, max: 100, unit: "%", steps: 101 },
+  "gate/ratio": { type: "list", options: ["1:1.5", "1:2", "1:3", "1:4", "GATE"] },
+  "dyn/mdl": { type: "list", options: ["COMP", "EXP"] },
+  "dyn/mix": { type: "lin", min: 0, max: 100, unit: "%", steps: 101 },
+  "dyn/gain": { type: "lin", min: -6, max: 12, unit: "dB", steps: 37, digits: 1 },
+  "dyn/thr": { type: "lin", min: -60, max: 0, unit: "dB", steps: 121, digits: 1 },
+  "dyn/ratio": { type: "list", options: ["1.1", "1.3", "1.5", "2.0", "2.5", "3.0", "4.0", "5.0", "7.0", "10", "20", "50", "100"] },
+  "dyn/knee": { type: "lin", min: 0, max: 5, steps: 6 },
+  "dyn/det": { type: "list", options: ["PEAK", "RMS"] },
+  "dyn/att": { type: "lin", min: 0, max: 120, unit: "ms", steps: 121, digits: 1 },
+  "dyn/hld": { type: "log", min: 1, max: 200, unit: "ms", steps: 101, digits: 1 },
+  "dyn/rel": { type: "log", min: 4, max: 4000, unit: "ms", steps: 101, digits: 1 },
+  "dyn/env": { type: "list", options: ["LIN", "LOG"] },
+  "dyn/auto": { type: "int", min: 0, max: 1 },
 };
 for (const b of ["l", "1", "2", "3", "4", "h"]) {
   DEFS[`${b}g`] = { type: "lin", min: -15, max: 15, unit: "dB", steps: 301, digits: 1 };
@@ -136,6 +158,34 @@ for (let ch = 1; ch <= 40; ch++) {
   set(`${t}/tf`, 0);
   set(`${t}/mdl`, "TILT");
   set(`${t}/tilt`, 0);
+}
+// Gate e compressor: canais de voz com compressor ligado; bateria com gate ligado.
+for (let ch = 1; ch <= 40; ch++) {
+  const g = `/ch/${ch}/gate`;
+  const drum = ch >= 13 && ch <= 17;
+  set(`${g}/on`, drum ? 1 : 0);
+  set(`${g}/mdl`, "GATE");
+  set(`${g}/thr`, drum ? -28 : -60);
+  set(`${g}/range`, 40);
+  set(`${g}/att`, 0.5);
+  set(`${g}/hld`, 20);
+  set(`${g}/rel`, 150);
+  set(`${g}/acc`, 0);
+  set(`${g}/ratio`, "GATE");
+  const d = `/ch/${ch}/dyn`;
+  set(`${d}/on`, ch <= 12 ? 1 : 0);
+  set(`${d}/mdl`, "COMP");
+  set(`${d}/mix`, 100);
+  set(`${d}/gain`, ch <= 6 ? 3 : 0);
+  set(`${d}/thr`, ch <= 6 ? -24 : -18);
+  set(`${d}/ratio`, ch <= 6 ? "3.0" : "2.0");
+  set(`${d}/knee`, 2);
+  set(`${d}/det`, "RMS");
+  set(`${d}/att`, 10);
+  set(`${d}/hld`, 10);
+  set(`${d}/rel`, 120);
+  set(`${d}/env`, "LOG");
+  set(`${d}/auto`, 0);
 }
 // Envios: canais e aux -> buses 1..16 e MX1..8; bus e main -> MX1..8 (com pre em vez de mode).
 for (const [kind, count] of [["ch", 40], ["aux", 8]] as const) {
@@ -359,6 +409,17 @@ function parseMeterTokens(bytes: number[], client: MeterClient): void {
   bytes.splice(0, i);
 }
 
+/** Ganho do gate e do compressor simulados para um nível de entrada (dB). */
+function dynGains(ch: number, input: number): [number, number] {
+  const num = (p: string) => { const v = values.get(p); return typeof v === "number" ? v : 0; };
+  const gateOn = num(`/ch/${ch}/gate/on`) === 1;
+  const gate = gateOn && input < num(`/ch/${ch}/gate/thr`) ? -num(`/ch/${ch}/gate/range`) : 0;
+  const ratio = Number(values.get(`/ch/${ch}/dyn/ratio`)) || 1;
+  const over = input - num(`/ch/${ch}/dyn/thr`);
+  const dyn = num(`/ch/${ch}/dyn/on`) === 1 && over > 0 ? -over * (1 - 1 / ratio) : 0;
+  return [gate, dyn];
+}
+
 const meterUdp = dgram.createSocket("udp4");
 let t = 0;
 setInterval(() => {
@@ -374,7 +435,10 @@ setInterval(() => {
       const mute = values.get(`/${l.kind}/${l.index}/mute`);
       const silent = mute === 1 || fdr === -144 || (l.kind === "ch" && l.index > 20);
       const level = silent ? -128 : -30 + 12 * Math.sin(t * 2 + l.index) + (typeof fdr === "number" ? fdr / 3 : 0);
-      for (let w = 0; w < l.words; w++) pkt.writeInt16BE(Math.round(Math.max(-128, level - (w % 2) * 1.5) * 256), off + w * 2);
+      const words = Array.from({ length: l.words }, (_, w) => Math.max(-128, level - (w % 2) * 1.5));
+      // Canal: palavra 5 = ganho do gate, 7 = ganho do compressor (Table 5), em dB (0 = sem redução).
+      if (l.kind === "ch" && l.words >= 8) [words[5], words[7]] = dynGains(l.index, silent ? -128 : level + 10);
+      words.forEach((v, w) => pkt.writeInt16BE(Math.round(v * 256), off + w * 2));
       off += l.words * 2;
     }
     meterUdp.send(pkt, c.port, c.address);

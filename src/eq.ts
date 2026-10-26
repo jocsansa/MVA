@@ -5,7 +5,7 @@
 // Toda escrita passa por WingClient.setParam: confere a descrição atual do nó, escreve uma
 // vez e lê de volta. Com dryRun só valida e devolve o comando exato (nada é escrito).
 
-import { parseWingNumber, riskWarning, type NodeChild, type ParamDesc, type ParamType } from "./schema.ts";
+import { descValue, paramState, type NodeChild, type ParamState } from "./schema.ts";
 import { isValidChannel, writeParam, type ParamWriteResult, type WingClient } from "./wing.ts";
 
 export type EqSection = "eq" | "flt";
@@ -39,40 +39,16 @@ export function eqParamPath(ch: number, section: EqSection, param: string): stri
   return `/ch/${ch}/${section}/${param}`;
 }
 
-export interface EqParam {
-  name: string;
-  path: string;
-  type: ParamType;
-  /** Número para int/lin/log, texto para list. */
-  value: number | string | null;
-  readOnly: boolean;
-  min?: number;
-  max?: number;
-  unit?: string;
-  steps?: number;
-  options?: string[];
-  risk: string | null;
-}
-
-/** Valor do texto da descrição: "1k08" -> 1080, "SHV" -> "SHV". */
-export function descValue(desc: ParamDesc): number | string | null {
-  if (desc.valueText === null || desc.valueText === "") return null;
-  if (desc.type === "list" || desc.type === "string") return desc.valueText;
-  try {
-    return parseWingNumber(desc.valueText);
-  } catch {
-    return null;
-  }
-}
+/** Parâmetro de EQ/filtro: mesmo formato genérico dos outros painéis. */
+export type EqParam = ParamState;
+export { descValue };
 
 /** Parâmetros aceitos da seção, com faixa e valor atual tirados da descrição. */
 export function sectionState(ch: number, section: EqSection, children: NodeChild[]): Record<string, EqParam> {
   const out: Record<string, EqParam> = {};
   for (const c of children) {
     if (c.kind !== "param" || !SECTION_PARAMS[section].includes(c.name)) continue;
-    const path = `/ch/${ch}/${section}/${c.name}`;
-    const { kind: _kind, valueText: _text, ...range } = c;
-    out[c.name] = { ...range, path, value: descValue(c), risk: c.readOnly ? null : riskWarning(path) };
+    out[c.name] = paramState(`/ch/${ch}/${section}/${c.name}`, c);
   }
   return out;
 }

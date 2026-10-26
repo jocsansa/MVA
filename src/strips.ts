@@ -37,6 +37,9 @@ export const STRIP_INFO = Object.fromEntries(STRIP_KINDS.map((k) => [k.kind, k])
 export interface StripMeter {
   l: number;
   r: number;
+  /** Só canais: ganho aplicado pelo gate e pelo compressor em dB (0 = sem redução). */
+  gate?: number;
+  dyn?: number;
 }
 
 export interface StripState {
@@ -120,6 +123,16 @@ export function stripMeterFromWords(words: number[]): StripMeter | null {
   return l === undefined || r === undefined ? null : { l, r };
 }
 
+/**
+ * Canal: palavra 5 = ganho do gate, 7 = ganho do compressor (Table 5; mesmo mapa de
+ * parseChannelMeters em native.ts). Ainda não conferido na mesa real.
+ */
+export function channelDynFromWords(words: number[]): { gate: number; dyn: number } | null {
+  const gate = words[5];
+  const dyn = words[7];
+  return gate === undefined || dyn === undefined ? null : { gate, dyn };
+}
+
 /** Report id da coleção única de medidores. */
 export const METER_REPORT_ID = 1;
 
@@ -148,7 +161,9 @@ export function splitMeterPacket(packet: Buffer): { kind: StripKind; index: numb
       if (off + words * 2 > packet.length) return out;
       const vals: number[] = [];
       for (let w = 0; w < words; w++) vals.push(packet.readInt16BE(off + w * 2) / 256);
-      out.push({ kind: k.kind, index: i, meter: stripMeterFromWords(vals) });
+      const meter = stripMeterFromWords(vals);
+      if (meter && k.kind === "ch") Object.assign(meter, channelDynFromWords(vals));
+      out.push({ kind: k.kind, index: i, meter });
       off += words * 2;
     }
   }

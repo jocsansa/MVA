@@ -137,6 +137,40 @@ export function encodeParamValue(desc: ParamDesc, value: unknown): { arg: OscArg
   }
 }
 
+/** Parâmetro como os painéis mostram: faixa e opções da descrição, valor atual e aviso de risco. */
+export interface ParamState {
+  name: string;
+  path: string;
+  type: ParamType;
+  /** Número para int/lin/log/fader, texto para list/string. */
+  value: number | string | null;
+  readOnly: boolean;
+  min?: number;
+  max?: number;
+  unit?: string;
+  steps?: number;
+  options?: string[];
+  maxLength?: number;
+  risk: string | null;
+}
+
+/** Valor do texto da descrição: "1k08" -> 1080, "-oo" -> -144 (fader), "SHV" -> "SHV". */
+export function descValue(desc: ParamDesc): number | string | null {
+  if (desc.valueText === null || desc.valueText === "") return null;
+  if (desc.type === "list" || desc.type === "string") return desc.valueText;
+  try {
+    const n = parseWingNumber(desc.valueText);
+    return n === -Infinity ? (desc.min ?? null) : n;
+  } catch {
+    return null;
+  }
+}
+
+export function paramState(path: string, desc: ParamDesc): ParamState {
+  const { kind: _kind, valueText: _text, ...range } = desc;
+  return { ...range, path, value: descValue(desc), risk: desc.readOnly ? null : riskWarning(path) };
+}
+
 /**
  * Confere o valor lido de volta com o pedido. A mesa arredonda para o passo mais próximo
  * (ex.: ganho AES50 em passos de 2,5 dB); em log o passo é relativo ao valor.
@@ -191,6 +225,11 @@ export function riskWarning(path: string): string | null {
   }
   if (/\/eq\/(on|mdl)$/.test(path)) return "Liga/desliga ou troca o EQ inteiro do canal: o timbre muda de uma vez.";
   if (/\/eq\/[lh1-4]g$/.test(path)) return "Ganho de EQ: reforço alto pode causar microfonia.";
+  if (/^\/ch\/\d+\/gate\/(on|mdl|thr|range)$/.test(path)) {
+    return "Gate: se fechar demais, corta o sinal (a voz ou o instrumento some).";
+  }
+  if (/^\/ch\/\d+\/dyn\/gain$/.test(path)) return "Ganho de maquiagem: reforço alto pode causar microfonia.";
+  if (/^\/ch\/\d+\/dyn\/(on|mdl)$/.test(path)) return "Liga/desliga ou troca o compressor: volume e timbre mudam de uma vez.";
   if (/^\/main\/\d+\/(mute|fdr)$/.test(path)) return "Main: afeta o som do PA inteiro.";
   if (/^\/dca\/\d+\/(mute|fdr)$/.test(path)) return "DCA: afeta todos os canais atribuídos a ele.";
   if (/^\/mgrp\/\d+\/mute$/.test(path)) return "Mute group: muta/desmuta vários canais de uma vez.";

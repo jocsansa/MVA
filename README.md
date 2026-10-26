@@ -1,8 +1,9 @@
 # WING Remote
 
 Controle da Behringer WING pela rede, com interface no navegador (Node.js + TypeScript).
-Por padrão o app é **somente leitura**; comandos só com `WING_ALLOW_WRITES=1` e sempre
-com confirmação na página.
+Por padrão o app é **somente leitura**; comandos só com `WING_ALLOW_WRITES=1`. Cada
+escrita é validada na descrição da mesa, mostra o comando exato e os avisos de risco e é
+lida de volta (sem etapa de confirmação por enquanto; veja "Confirmação removida").
 
 ## Instalar (em qualquer computador)
 
@@ -77,10 +78,12 @@ CONSOLE_HOST=<ip-da-wing> WING_ALLOW_WRITES=1 npm start
 A página tem uma aba por tipo de strip: Canais (40), Aux (8), Buses (16), Mains (4),
 Matrizes (8), DCAs (16) e Mute groups (8). Nome, fader, pan e ganho viram caixas de
 texto (Enter envia, Esc desfaz); MUTE e S (solo) viram botões; a barra colorida no topo
-abre a escolha de cor. Antes de enviar, a página mostra o comando exato e pede
-confirmação; main, DCA, mute group, phantom e patch mostram um aviso extra. Toda escrita
-aparece no terminal com os bytes, e o app lê o valor de volta para confirmar (a WING não
-ecoa escritas).
+abre a paleta de cores (tocar numa cor já envia). A escrita vai direto, sem etapa de
+confirmação: a barra no rodapé mostra o comando exato que está saindo, o resultado da
+leitura de volta e os avisos de risco (main, DCA, mute group, phantom, patch, ganho na
+fonte, aumento de mais de 6 dB). Toda escrita aparece no terminal com os bytes, e o app
+lê o valor de volta para confirmar (a WING não ecoa escritas). `POST /api/param` e
+`POST /api/channels/N/gain` devolvem `command` (o comando exato) e `risk`.
 
 | Comando | Mensagem |
 |---|---|
@@ -114,11 +117,12 @@ de `mode`. Envio de bus para bus existe mas é somente leitura.
 
 Medidores: uma coleção só com todos os tipos (tokens `0xa0`..`0xa5`; na WING real um pedido
 novo substitui o anterior na mesma conexão), 8 valores por
-strip e 4 no DCA; a página mostra a saída (L/R).
+strip e 4 no DCA; a página mostra a saída (L/R). Nos canais, as palavras 5 e 7 são o
+ganho do gate e do compressor (Table 5), usadas no medidor de redução de ganho.
 
 ### EQ e filtro dos canais
 
-Aba **EQ** (ou botão EQ no card do canal; link direto `http://localhost:3000/#eq/5`). PEQ de
+Aba **Canal**, seção EQ (ou botão EQ no card do canal; link direto `http://localhost:3000/#eq/5`). PEQ de
 6 bandas (LOW, 1–4, HIGH; LOW e HIGH podem ser PEQ ou shelf) e filtros passa-alta e
 passa-baixa. Soltar um ponto arrastado na curva, tocar em −/+, digitar ou escolher uma
 opção envia na hora, sem etapa de confirmação (veja abaixo). Cada comando é validado na
@@ -128,12 +132,11 @@ os avisos de risco; o aviso do passa-alta fica sempre visível no painel. O pain
 o EQ modelo STD (outros modelos têm outros parâmetros).
 
 **Confirmação removida (temporário):** a etapa de confirmação antes de enviar foi removida
-do painel de EQ, da aba Sends e do fluxo por chat a pedido do usuário, enquanto ele não
-está usando a mesa ao vivo. Validação, avisos de risco, leitura de volta e o padrão somente leitura
-(escrita só com `WING_ALLOW_WRITES=1`) continuam. Para uso ao vivo, a confirmação pode
-ser recolocada: a rota já tem o `dryRun`, que devolve o comando exato sem escrever. Os
-outros controles da página (nome, mute, fader, pan, cor, ganho) continuam pedindo
-confirmação.
+de toda a página (controles da grade, EQ, dinâmica e Sends) a pedido do usuário (Jocsan,
+25/10), enquanto ele não está usando a mesa ao vivo. Validação, avisos de risco, leitura
+de volta e o padrão somente leitura (escrita só com `WING_ALLOW_WRITES=1`) continuam.
+Para uso ao vivo, a confirmação pode ser recolocada: as rotas de EQ, dinâmica e sends têm
+`dryRun`, que devolve o comando exato sem escrever.
 
 | Rota | O que faz |
 |---|---|
@@ -177,13 +180,34 @@ comando). A resposta tem `ok`, `command`, `risk` e `readBack`.
 | `src` | para bus: `ch/1..40`, `aux/1..8`; para matriz: também `bus/1..16`, `main/1..4` |
 | `param` | `lvl` (`,f` -144 = -∞ a +10 dB), `on` (`,i` 0/1); canal e aux: `mode` (`,s` `PRE`/`POST`/`GRP`); bus e main: `pre` (`,i` 1 = pré, 0 = pós) |
 
+### Dinâmica dos canais (gate e compressor)
+
+Aba **Canal**, seções Gate e Compressor (links diretos `#gate/5` e `#dyn/5`). Os controles
+são montados pela **descrição do nó na mesa** (`/ch/N/gate`, `/ch/N/dyn`): o app mostra todos
+os parâmetros que a mesa expõe para o modelo escolhido (threshold, alcance, attack, hold,
+release, ratio, knee, makeup, mix, detector...), com faixa e opções vindas dela; trocar o
+modelo relê o nó. Curva de transferência (entrada x saída; arrastar para os lados muda o
+threshold) e medidor de redução de ganho. Como no EQ, as mudanças vão direto, uma por vez,
+com o comando exato e os avisos na barra e leitura de volta.
+
+| Rota | O que faz |
+|---|---|
+| `GET /api/channels/N/dyn` | Gate (`gate`) e compressor (`dyn`): modelo, on e todos os parâmetros com valor, faixa, opções, somente leitura e risco |
+| `POST /api/channels/N/gate` `{param, value}` | Escreve um parâmetro do gate (qualquer nome que a descrição da mesa aceite) |
+| `POST /api/channels/N/dyn` `{param, value}` | Escreve um parâmetro do compressor |
+| … com `"dryRun": true` | Só valida na descrição da mesa e devolve o comando exato |
+
+Ainda não conferido na mesa real: a lista exata de parâmetros de cada modelo (o simulador
+usa uma versão plausível) e o mapa das palavras 5 e 7 do medidor como ganho do gate e do
+compressor.
+
 ### Comandar pelo chat (Claude Code)
 
-As rotas acima são HTTP local, então o Claude Code pode operar a mesa a pedido no chat.
-O Claude lê (`GET /api/channels/N/eq`), mostra o comando OSC exato e o aviso de risco
-(com `dryRun`) e envia, uma escrita por vez, informando a leitura de volta. Não há etapa
-separada de confirmação (removida a pedido do usuário enquanto não está ao vivo): o "sim"
-do usuário para prosseguir já cobre o envio.
+As rotas acima são HTTP local, então o Claude Code pode operar a mesa a pedido no chat
+(EQ, dinâmica, sends e a rota genérica). Ler não precisa de nada. Para escrever, o Claude
+mostra o comando OSC exato e o aviso de risco (com `dryRun`), pergunta e só envia depois
+do "sim" do usuário, uma escrita por vez, informando a leitura de volta. Não há uma etapa
+de confirmação a mais além desse "sim".
 
 ```
 curl -s http://localhost:3000/api/channels/5/eq
@@ -192,6 +216,9 @@ curl -s -H "content-type: application/json" -d '{"param":"1g","value":-3}' http:
 curl -s "http://localhost:3000/api/sends?dest=bus/3"
 curl -s -H "content-type: application/json" -d '{"src":"ch/5","dest":"bus/3","param":"lvl","value":-10,"dryRun":true}' http://localhost:3000/api/sends
 curl -s -H "content-type: application/json" -d '{"src":"ch/5","dest":"bus/3","param":"lvl","value":-10}' http://localhost:3000/api/sends
+curl -s http://localhost:3000/api/channels/5/dyn
+curl -s -H "content-type: application/json" -d '{"param":"thr","value":-20,"dryRun":true}' http://localhost:3000/api/channels/5/dyn
+curl -s -H "content-type: application/json" -d '{"param":"thr","value":-20}' http://localhost:3000/api/channels/5/dyn
 ```
 
 A rota recusa pedidos com `Origin` de outro site e sem `content-type: application/json`.

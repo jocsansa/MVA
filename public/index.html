@@ -63,22 +63,16 @@
   #dlg .box { width:min(440px, calc(100vw - 32px)); background:var(--panel); border:1px solid var(--line); border-radius:8px;
     padding:16px; display:flex; flex-direction:column; gap:12px; }
   #dlg h2 { margin:0; font-size:16px; }
-  #dlg .cmd { font-family:ui-monospace, Menlo, monospace; font-size:13px; background:#0b0c0e; padding:8px; border-radius:4px;
-    overflow-wrap:anywhere; }
-  #dlg .err { font-size:13px; min-height:1em; }
-  #dlg .note { font-size:13px; color:var(--yellow); }
-  #dlg .note:empty, #dlg .extra:empty { display:none; }
   #dlg .btns { justify-content:flex-end; gap:8px; }
   #dlg .btns button { font:inherit; padding:6px 14px; border-radius:4px; border:1px solid var(--line); background:#262a31; color:var(--text); cursor:pointer; }
-  #dlg button.primary { background:var(--red); border-color:var(--red); color:#fff; font-weight:600; }
-  #dlg button:disabled { opacity:.5; cursor:default; }
   .swatches { display:grid; grid-template-columns:repeat(9, 1fr); gap:6px; }
   .swatches button { aspect-ratio:1; border-radius:4px; border:2px solid transparent; cursor:pointer; font-size:10px; color:#111; }
   .swatches button.sel { border-color:var(--text); }
   #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); max-width:calc(100vw - 32px); padding:8px 14px;
     border-radius:6px; background:var(--panel); border:1px solid var(--line); display:none; z-index:11; }
   #toast.show { display:block; }
-  #dlg .cmd { white-space:pre-wrap; }
+  #grid { padding-bottom:120px; }
+  #grid-status { --ink2:#c8ced6; --go:#ffd400; }
   .eq-tag { flex:0 0 32px; cursor:pointer; }
   .eq-tag:hover { border-color:var(--text); color:var(--text); }
 
@@ -168,6 +162,43 @@
   .eq-status-risk { color:var(--go); font-size:14px; font-weight:600; }
   .eq-status-cmd:empty, .eq-status-risk:empty { display:none; }
 
+  /* ---------- dinâmica do canal (gate e compressor) ---------- */
+  .ch-sections { margin:0 0 12px; }
+  .ch-sections .big.on { background:var(--cc); border-color:var(--cc); color:var(--cc-ink); }
+  .dyn-top { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  .dyn-top .seg { flex:1; min-width:200px; flex-wrap:wrap; }
+  .dyn-main { display:grid; grid-template-columns:minmax(0, 1fr) 104px; gap:12px; }
+  #dyn-graph { display:block; touch-action:none; user-select:none; -webkit-user-select:none; cursor:ew-resize; }
+  #dyn-graph .g { stroke:#1c2026; stroke-width:1; }
+  #dyn-graph .g-major { stroke:#343c47; }
+  #dyn-graph .gl { fill:#9aa3ad; font-size:11px; }
+  #dyn-graph .unity { stroke:#4a525e; stroke-width:1.5; stroke-dasharray:5 5; }
+  #dyn-graph .c-main { fill:none; stroke:#fff; stroke-width:3; }
+  #dyn-graph .c-old { fill:none; stroke:#9aa3ad; stroke-width:2; stroke-dasharray:6 5; }
+  #dyn-graph.dim .c-main { stroke:#6b737d; }
+  #dyn-graph .thr { stroke:var(--go); stroke-width:2; stroke-dasharray:4 4; }
+  #dyn-graph .thr-h { fill:var(--go); stroke:#000; stroke-width:2; }
+  #dyn-graph .thr-t { fill:var(--go); font-size:13px; font-weight:800; }
+  .gr { display:flex; flex-direction:column; align-items:center; gap:6px; padding:10px 8px; background:var(--bg1);
+    border:2px solid var(--edge); border-radius:12px; }
+  .gr-l { font-size:12px; font-weight:700; color:var(--ink2); text-align:center; }
+  .gr-bar { position:relative; flex:1; width:36px; min-height:140px; background:var(--bg0); border:2px solid var(--edge);
+    border-radius:8px; overflow:hidden; }
+  .gr-fill { position:absolute; left:0; right:0; top:0; height:0; background:linear-gradient(#ffd400, #ff7b29 60%, #f85149);
+    transition:height 60ms linear; }
+  .gr-val { font-size:16px; font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .dyn-params { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:10px; margin-top:12px;
+    align-items:start; }
+  .dyn-item { display:flex; flex-direction:column; gap:8px; padding:10px; background:var(--bg1); border:2px solid var(--edge);
+    border-radius:12px; }
+  .dyn-item.changed { border-color:var(--go); }
+  .dyn-item h4 { margin:0; min-height:24px; font-size:14px; color:var(--ink2); display:flex; justify-content:space-between;
+    align-items:center; gap:8px; }
+  .dyn-item .seg { flex-wrap:wrap; }
+  .dyn-item .seg .big { flex:1 0 60px; }
+  .dyn-item .stp { grid-template-columns:minmax(5.4em, auto) 52px minmax(0, 1fr) 52px; }
+  .dyn-ro { color:var(--ink); font-variant-numeric:tabular-nums; }
+
   /* ---------- visão de sends ---------- */
   .snd-dests { display:flex; flex-direction:column; gap:6px; }
   .snd-row-l { font-size:13px; font-weight:700; color:var(--ink2); }
@@ -200,6 +231,7 @@
   .sst-modes .big.on { background:#fff; border-color:#fff; color:#000; }
   .big.ghost.on { background:#fff; border-color:#fff; color:#000; }
   @media (max-width:560px) {
+    .dyn-main { grid-template-columns:minmax(0, 1fr) 84px; }
     /* Celular: cada grupo vira uma fileira de faders com rolagem horizontal, como numa mesa. */
     .snd-grid { grid-auto-flow:column; grid-auto-columns:128px; grid-template-columns:none; overflow-x:auto;
       padding-bottom:6px; scroll-snap-type:x proximity; }
@@ -225,7 +257,10 @@
   <code>CONSOLE_HOST=&lt;ip&gt; WING_ALLOW_WRITES=1 npm start</code></div>
 <nav id="tabs"></nav>
 <div id="grid"></div>
-<section id="eq" hidden aria-label="EQ do canal">
+<div class="eq-status" id="grid-status" role="status" aria-live="polite">
+  <div class="eq-status-main"></div><div class="eq-status-cmd"></div><div class="eq-status-risk"></div>
+</div>
+<section id="eq" hidden aria-label="Canal: EQ e dinâmica">
   <div class="eq-chips" id="eq-chips" aria-label="Escolher canal"></div>
   <div class="eq-head">
     <div class="eq-id"><span class="eq-chnum" id="eq-chnum"></span><span class="eq-chname" id="eq-chname"></span>
@@ -235,13 +270,26 @@
       <button type="button" class="big ghost" id="eq-reload" title="Ler de novo da mesa">Reler</button>
     </div>
   </div>
+  <div class="seg ch-sections" id="ch-sections" aria-label="Seção do canal"></div>
   <div class="eq-msg" id="eq-msg"></div>
-  <div class="eq-graph-wrap" id="eq-graph-wrap"><svg id="eq-graph" role="img" aria-label="Curva de EQ e filtros"></svg></div>
-  <div class="eq-bands" id="eq-bands"></div>
-  <div class="eq-lower">
-    <div class="eq-card band-card" id="eq-band-card"></div>
-    <div class="eq-card" id="eq-hpf"></div>
-    <div class="eq-card" id="eq-lpf"></div>
+  <div id="eq-view">
+    <div class="eq-graph-wrap" id="eq-graph-wrap"><svg id="eq-graph" role="img" aria-label="Curva de EQ e filtros"></svg></div>
+    <div class="eq-bands" id="eq-bands"></div>
+    <div class="eq-lower">
+      <div class="eq-card band-card" id="eq-band-card"></div>
+      <div class="eq-card" id="eq-hpf"></div>
+      <div class="eq-card" id="eq-lpf"></div>
+    </div>
+  </div>
+  <div id="dyn-view" hidden>
+    <div class="dyn-top" id="dyn-top"></div>
+    <div class="dyn-main">
+      <div class="eq-graph-wrap" id="dyn-graph-wrap"><svg id="dyn-graph" role="img"
+        aria-label="Curva de transferência: entrada (horizontal) x saída (vertical); arraste para mudar o threshold"></svg></div>
+      <div class="gr" aria-label="Redução de ganho"><div class="gr-l" id="dyn-gr-l">Redução</div>
+        <div class="gr-bar"><div class="gr-fill" id="dyn-gr-fill"></div></div><div class="gr-val" id="dyn-gr-val">—</div></div>
+    </div>
+    <div class="dyn-params" id="dyn-params"></div>
   </div>
   <div class="eq-status" id="eq-status" role="status" aria-live="polite">
     <div class="eq-status-main"></div><div class="eq-status-cmd"></div><div class="eq-status-risk"></div>
@@ -270,14 +318,7 @@
   <div class="box">
     <h2 id="dlg-title"></h2>
     <div class="extra" id="dlg-extra"></div>
-    <div>Comando que será enviado à mesa:</div>
-    <div class="cmd" id="dlg-cmd"></div>
-    <div class="note" id="dlg-note"></div>
-    <div class="err" id="dlg-err"></div>
-    <div class="btns">
-      <button type="button" id="dlg-cancel">Cancelar</button>
-      <button type="button" class="primary" id="dlg-ok">Enviar</button>
-    </div>
+    <div class="btns"><button type="button" id="dlg-cancel">Fechar</button></div>
   </div>
 </div>
 <div id="toast"></div>
@@ -316,56 +357,21 @@
     return NaN;
   }
 
-  // ---------- janela de confirmação ----------
+  // ---------- paleta de cores (a única janela da página: não há etapa de confirmação) ----------
   const dlg = {
     root: document.getElementById("dlg"), title: document.getElementById("dlg-title"),
-    extra: document.getElementById("dlg-extra"), cmd: document.getElementById("dlg-cmd"),
-    note: document.getElementById("dlg-note"), err: document.getElementById("dlg-err"),
-    ok: document.getElementById("dlg-ok"), cancel: document.getElementById("dlg-cancel"), action: null, onCancel: null,
+    extra: document.getElementById("dlg-extra"), close: document.getElementById("dlg-cancel"),
   };
-  function openDialog({ title, cmd, error, note, extra, send, onCancel }) {
+  function openPicker(title, content) {
     dlg.title.textContent = title;
-    dlg.cmd.textContent = cmd || "—";
-    dlg.err.textContent = error || "";
-    dlg.note.textContent = note || "";
-    dlg.extra.replaceChildren(...(extra ? [extra] : []));
-    dlg.ok.disabled = !!error;
-    dlg.onCancel = onCancel || null;
-    let busy = false;
-    dlg.action = async () => {
-      if (busy || dlg.ok.disabled) return; // um clique = uma escrita
-      busy = true;
-      dlg.ok.disabled = true;
-      dlg.err.textContent = "Enviando…";
-      const msg = await send();
-      busy = false;
-      if (msg) { dlg.err.textContent = msg; dlg.ok.disabled = false; return; }
-      dlg.onCancel = null;
-      closeDialog();
-    };
+    dlg.extra.replaceChildren(content);
     dlg.root.classList.add("open");
-    dlg.ok.focus();
+    dlg.close.focus();
   }
-  function setDialogCmd(cmd, error) {
-    dlg.cmd.textContent = cmd || "—";
-    dlg.err.textContent = error || "";
-    dlg.ok.disabled = !!error;
-  }
-  function closeDialog() {
-    dlg.root.classList.remove("open");
-    dlg.action = null;
-    const cancel = dlg.onCancel;
-    dlg.onCancel = null;
-    if (cancel) cancel();
-  }
-  dlg.ok.addEventListener("click", () => dlg.action && dlg.action());
-  dlg.cancel.addEventListener("click", closeDialog);
+  function closeDialog() { dlg.root.classList.remove("open"); }
+  dlg.close.addEventListener("click", closeDialog);
   dlg.root.addEventListener("click", (e) => { if (e.target === dlg.root) closeDialog(); });
-  document.addEventListener("keydown", (e) => {
-    if (!dlg.action) return;
-    if (e.key === "Escape") closeDialog();
-    if (e.key === "Enter") { e.preventDefault(); dlg.action(); }
-  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && dlg.root.classList.contains("open")) closeDialog(); });
 
   let toastTimer = null;
   function toast(text, isError) {
@@ -391,26 +397,28 @@
     try { return (await (await fetch("/api/risk?path=" + encodeURIComponent(path))).json()).risk || ""; } catch { return ""; }
   }
 
-  /**
-   * Confirma e envia um parâmetro pela rota genérica (/api/param), que valida contra a
-   * descrição da própria mesa. argText: como o comando aparece na janela.
-   */
-  async function confirmParam({ path, value, argText, title, note, onCancel, done }) {
-    const risk = await riskFor(path);
-    openDialog({
-      title,
-      cmd: `${path} ${argText}`,
-      note: [risk, note].filter(Boolean).join(" "),
-      send: async () => {
-        const r = await postJson("/api/param", { path, value });
-        if (r.error) return r.error;
-        if (!r.data.ok) return `A mesa não confirmou. Valor lido: ${r.data.readBack.text}`;
-        if (done) done();
-        return null;
-      },
-      onCancel,
+  // ---------- escrita direta dos controles da grade ----------
+  // Sem etapa de confirmação (pedido do usuário enquanto não está ao vivo). O valor é conferido
+  // aqui, a rota valida na descrição da mesa e lê de volta; a barra de status mostra o comando
+  // exato e os avisos de risco antes e depois de enviar. Um comando por vez, na ordem.
+  const gridStatus = statusBar(document.getElementById("grid-status"));
+  let gridQueue = Promise.resolve();
+  function gridSend({ label, path, command, risks = [], post, done }) {
+    gridQueue = gridQueue.then(async () => {
+      const rs = new Set(risks.filter(Boolean));
+      const risk = path ? await riskFor(path) : "";
+      if (risk) rs.add(risk);
+      gridStatus.show("sending", `Enviando ${label}:`, [command], rs);
+      const r = await post();
+      const sent = r.data && r.data.command ? r.data.command : command;
+      if (r.data && r.data.risk) rs.add(r.data.risk);
+      if (r.error) gridStatus.show("err", `${label}: ${r.error}`.replace(/\.?$/, ".") + " Nada foi alterado.", [command], rs);
+      else if (!r.data.ok) gridStatus.show("err", `A mesa não confirmou ${label} (lido: ${r.data.readBack.text}).`, [sent], rs);
+      else gridStatus.show(rs.size ? "risk" : "ok", `${label}: enviado e confirmado pela mesa (leitura de volta).`, [sent], rs);
+      if (done) done();
     });
   }
+  const postParam = (path, value) => postJson("/api/param", { path, value });
 
   // ---------- campos editáveis (Enter confirma, Esc desfaz) ----------
   function bindEditable(input, currentText, onCommit) {
@@ -434,52 +442,42 @@
   function editName(st, c, text) {
     const revert = () => endEdit(c.name, now(st).name);
     if (!writable()) return revert();
-    let error = null;
-    if (text.length > 16) error = "Máximo de 16 caracteres.";
-    else if (!/^[\x20-\x7e]*$/.test(text)) error = "Use só letras sem acento, números e símbolos.";
+    const error = text.length > 16 ? "máximo de 16 caracteres." : !/^[\x20-\x7e]*$/.test(text) ? "use só letras sem acento, números e símbolos." : null;
+    if (error) { toast(`Nome de ${PREFIX[st.kind]} ${st.index}: ${error}`, true); return revert(); }
     const path = `/${st.kind}/${st.index}/name`;
-    confirmParam({
-      path, value: text, argText: `,s ${JSON.stringify(text)}`,
-      title: `Renomear ${PREFIX[st.kind]} ${st.index}: ${JSON.stringify(st.name)} → ${JSON.stringify(text)}`,
-      onCancel: revert, done: () => { toast(`${PREFIX[st.kind]} ${st.index} renomeado`); revert(); },
-    }).then(() => error && setDialogCmd(dlg.cmd.textContent, error));
+    gridSend({ label: `nome de ${PREFIX[st.kind]} ${st.index}`, path, command: `${path} ,s ${JSON.stringify(text)}`,
+      post: () => postParam(path, text), done: revert });
   }
 
   function editFader(st, c, text) {
     const revert = () => endEdit(c.fdr, fmtNum(now(st).faderDb));
     if (!writable()) return revert();
     const db = parseDb(text);
+    const error = Number.isNaN(db) ? "digite um número em dB (ex.: -5, 0, +3) ou -inf." : (db < -144 || db > 10) ? "o fader vai de -∞ (-144) até +10 dB." : null;
+    if (error) { toast(`Fader de ${label(st)}: ${error}`, true); return revert(); }
     const path = `/${st.kind}/${st.index}/fdr`;
-    const error = Number.isNaN(db) ? "Digite um número em dB (ex.: -5, 0, +3) ou -inf." : (db < -144 || db > 10) ? "O fader vai de -∞ (-144) até +10 dB." : null;
-    confirmParam({
-      path, value: db, argText: `,f ${db}`,
-      title: `Fader "${label(st)}": ${fmtDb(st.faderDb ?? -144)} → ${error ? text : fmtDb(db)}`,
-      note: !error && db > (st.faderDb ?? -144) + 6 ? "Atenção: aumento de mais de 6 dB." : "",
-      onCancel: revert, done: () => { toast(`Fader de ${label(st)} em ${fmtDb(db)}`); revert(); },
-    }).then(() => error && setDialogCmd("—", error));
+    gridSend({ label: `fader de ${label(st)} (${fmtDb(db)})`, path, command: `${path} ,f ${db}`,
+      risks: [db > (st.faderDb ?? -144) + 6 ? "Aumento de mais de 6 dB." : ""],
+      post: () => postParam(path, db), done: revert });
   }
 
   function editPan(st, c, text) {
     const revert = () => endEdit(c.pan, fmtPan(now(st).pan));
     if (!writable()) return revert();
     const v = parsePan(text);
+    const error = Number.isNaN(v) ? "use L30, R20, C ou um número de -100 a 100." : (v < -100 || v > 100) ? "o pan vai de L100 a R100." : null;
+    if (error) { toast(`Pan de ${label(st)}: ${error}`, true); return revert(); }
     const path = `/${st.kind}/${st.index}/pan`;
-    const error = Number.isNaN(v) ? "Use L30, R20, C ou um número de -100 a 100." : (v < -100 || v > 100) ? "O pan vai de L100 a R100." : null;
-    confirmParam({
-      path, value: v, argText: `,f ${v}`,
-      title: `Pan "${label(st)}": ${fmtPan(st.pan)} → ${error ? text : fmtPan(v)}`,
-      onCancel: revert, done: () => { toast(`Pan de ${label(st)} em ${fmtPan(v)}`); revert(); },
-    }).then(() => error && setDialogCmd("—", error));
+    gridSend({ label: `pan de ${label(st)} (${fmtPan(v)})`, path, command: `${path} ,f ${v}`,
+      post: () => postParam(path, v), done: revert });
   }
 
   function toggle(st, key, param, word) {
     if (!writable() || st[key] == null) return;
     const on = !st[key];
-    confirmParam({
-      path: `/${st.kind}/${st.index}/${param}`, value: on ? 1 : 0, argText: `,i ${on ? 1 : 0}`,
-      title: `${on ? word[0] : word[1]} "${label(st)}"?`,
-      done: () => toast(`${label(st)}: ${on ? word[2] : word[3]}`),
-    });
+    const path = `/${st.kind}/${st.index}/${param}`;
+    gridSend({ label: `${on ? word[0] : word[1]} "${label(st)}"`, path, command: `${path} ,i ${on ? 1 : 0}`,
+      post: () => postParam(path, on ? 1 : 0) });
   }
 
   function editColor(st) {
@@ -487,7 +485,6 @@
     const box = document.createElement("div");
     box.className = "swatches";
     const path = `/${st.kind}/${st.index}/col`;
-    let sendColor = st.col;
     COLORS.forEach((hex, i) => {
       const b = document.createElement("button");
       b.type = "button";
@@ -495,23 +492,15 @@
       b.textContent = i + 1;
       b.title = `Cor ${i + 1}`;
       if (i + 1 === st.col) b.classList.add("sel");
+      // Tocar na cor já envia (sem etapa de confirmação).
       b.addEventListener("click", () => {
-        sendColor = i + 1;
-        box.querySelectorAll("button").forEach((x) => x.classList.toggle("sel", x === b));
-        setDialogCmd(`${path} ,i ${sendColor}`, sendColor === st.col ? "Essa já é a cor atual." : null);
+        closeDialog();
+        if (i + 1 === now(st).col) return;
+        gridSend({ label: `cor de ${label(st)} (${i + 1})`, path, command: `${path} ,i ${i + 1}`, post: () => postParam(path, i + 1) });
       });
       box.appendChild(b);
     });
-    openDialog({
-      title: `Cor de "${label(st)}"`, extra: box, cmd: `${path} ,i ${sendColor}`, error: "Escolha uma cor.",
-      send: async () => {
-        const r = await postJson("/api/param", { path, value: sendColor });
-        if (r.error) return r.error;
-        if (!r.data.ok) return `A mesa não confirmou. Valor lido: ${r.data.readBack.text}`;
-        toast(`Cor de ${label(st)} alterada`);
-        return null;
-      },
-    });
+    openPicker(`Cor de "${label(st)}"`, box);
   }
 
   // Ganho fica na fonte do canal: rota própria que confere a fonte antes de escrever.
@@ -519,31 +508,30 @@
     const revert = () => endEdit(c.gain, fmtNum(now(st).gainDb));
     if (!writable()) return revert();
     const db = parseDb(text);
-    let error = Number.isNaN(db) ? "Digite um número em dB (ex.: 20, 32.5)." : null;
+    let error = Number.isNaN(db) ? "digite um número em dB (ex.: 20, 32.5)." : null;
     let src = null;
-    try {
-      const res = await fetch(`/api/channels/${st.index}/source`);
-      src = await res.json();
-      if (!res.ok) error = error || src.error;
-      else if (!src.gainAddress) error = error || `Este canal usa a fonte ${src.grp} ${src.in}, que não tem ganho ajustável.`;
-    } catch (e) {
-      error = error || "Não foi possível ler a fonte do canal: " + e.message;
+    if (!error) {
+      try {
+        const res = await fetch(`/api/channels/${st.index}/source`);
+        src = await res.json();
+        if (!res.ok) error = src.error;
+        else if (!src.gainAddress) error = `este canal usa a fonte ${src.grp} ${src.in}, que não tem ganho ajustável.`;
+      } catch (e) {
+        error = "não foi possível ler a fonte do canal: " + e.message;
+      }
     }
-    const srcName = src && src.grp ? `${src.grp} ${src.in}${src.alt ? " (entrada alternativa)" : ""}` : "?";
-    openDialog({
-      title: `Ganho "${label(st)}": ${fmtDb(st.gainDb ?? 0)} → ${error ? text : fmtDb(db)}`,
-      cmd: error || !src ? "—" : `${src.gainAddress} ,f ${db}`, error,
-      note: error ? "" : `O ganho fica na fonte ${srcName}: muda em todos os canais que usam essa fonte.` +
-        (db > (st.gainDb ?? 0) + 6 ? " Atenção: aumento de mais de 6 dB." : ""),
-      send: async () => {
+    if (error) { toast(`Ganho de ${label(st)}: ${error}`, true); return revert(); }
+    const srcName = `${src.grp} ${src.in}${src.alt ? " (entrada alternativa)" : ""}`;
+    gridSend({
+      label: `ganho de ${label(st)} (fonte ${srcName}, ${fmtDb(db)})`, path: src.gainAddress, command: `${src.gainAddress} ,f ${db}`,
+      risks: [`O ganho fica na fonte ${srcName}: muda em todos os canais que usam essa fonte.`,
+        db > (st.gainDb ?? 0) + 6 ? "Aumento de mais de 6 dB." : ""],
+      post: async () => {
         const r = await postJson(`/api/channels/${st.index}/gain`, { db });
-        if (r.error) return r.error;
-        if (!r.data.ok) return `A mesa não confirmou. Valor lido: ${fmtDb(r.data.readBack)}`;
-        toast(`Ganho de ${label(st)} (${srcName}) em ${fmtDb(db)}`);
-        revert();
-        return null;
+        if (r.data) r.data = { ...r.data, readBack: { text: fmtDb(r.data.readBack) } };
+        return r;
       },
-      onCancel: revert,
+      done: revert,
     });
   }
 
@@ -563,7 +551,7 @@
       ${k.meter ? '<div class="meter"><div class="bar"></div><div class="bar"></div></div>' : ""}
       <div class="btns"><button type="button" class="tag mute-tag" disabled></button>
         ${has(st.kind, "$solo") ? '<button type="button" class="tag solo-tag" disabled title="Solo">S</button>' : ""}
-        ${st.kind === "ch" ? '<button type="button" class="tag eq-tag" title="Abrir o EQ do canal">EQ</button>' : ""}</div>
+        ${st.kind === "ch" ? '<button type="button" class="tag eq-tag" title="Abrir EQ e dinâmica do canal">EQ</button>' : ""}</div>
       ${has(st.kind, "fdr") ? '<label class="row"><span>Fader</span><span class="val"><input class="num-in fdr" readonly autocomplete="off"> dB</span></label>' : ""}
       ${has(st.kind, "pan") ? '<label class="row"><span>Pan</span><span class="val"><input class="num-in pan" readonly autocomplete="off"></span></label>' : ""}
       ${has(st.kind, "in/set/$g") ? '<label class="row"><span>Ganho</span><span class="val"><input class="num-in gain" readonly autocomplete="off"> dB</span></label>' : ""}`;
@@ -630,6 +618,7 @@
     eqPanel.hidden = kind !== "eq";
     sndPanel.hidden = kind !== "sends";
     document.body.classList.toggle("panel-mode", !!PANELS[kind]);
+    if (PANELS[kind]) gridStatus.hide();
     if (PANELS[kind]) return PANELS[kind]();
     grid.replaceChildren();
     for (const st of strips[kind]) grid.appendChild(card(st).el);
@@ -647,7 +636,7 @@
       b.addEventListener("click", () => showTab(k.kind));
       nav.appendChild(b);
     }
-    for (const [kind, text] of [["eq", "EQ"], ["sends", "Sends"]]) {
+    for (const [kind, text] of [["eq", "Canal"], ["sends", "Sends"]]) {
       const b = document.createElement("button");
       b.type = "button";
       b.dataset.kind = kind;
@@ -723,13 +712,20 @@
   function setPending(sec, p, v) {
     const d = eqDesc(sec, p);
     if (!d || !canEditEq() || v == null || (typeof v === "number" && !Number.isFinite(v))) return;
-    if (typeof v === "number" && (d.type === "lin" || d.type === "log")) {
-      const q = curveLib.quantize(v, d);
-      v = d.type === "log" ? Number(q.toPrecision(5)) : Math.round(q * 100) / 100;
-    }
+    if (typeof v === "number") v = normalizeNum(d, v);
     const k = `${sec}/${p}`;
     if (sameValue(d, v, d.value)) pending.delete(k);
     else pending.set(k, v);
+  }
+
+  /** Número no passo da faixa que a mesa descreveu (int: inteiro dentro da faixa). */
+  function normalizeNum(d, v) {
+    if (d.type === "int") return Math.round(clamp(v, d.min, d.max));
+    if (d.type === "lin" || d.type === "log") {
+      const q = curveLib.quantize(v, d);
+      return d.type === "log" ? Number(q.toPrecision(5)) : Math.round(q * 100) / 100;
+    }
+    return d.min !== undefined && d.max !== undefined ? clamp(v, d.min, d.max) : v;
   }
 
   function curveModel(get) {
@@ -752,7 +748,7 @@
   const yd = (y) => ((G.h / 2 - y) / (G.h / 2 - 14)) * DB_RANGE;
 
   function drawEq() {
-    if (eqPanel.hidden) return;
+    if (eqPanel.hidden || chSection !== "eq") return;
     const w = Math.max(280, Math.round(document.getElementById("eq-graph-wrap").clientWidth - 4));
     G = { w, h: Math.round(clamp(w * 0.42, 240, 420)) };
     const h = G.h;
@@ -851,7 +847,13 @@
   let wheelTimer = null;
 
   // ---- controles ----
-  /** Linha [rótulo] [−] [valor] [+]. o: { sec, param(), step(v, dir), fmt, parse } */
+  // Cada controle recebe uma ligação com o parâmetro: { get(), set(v), changed(), enabled(),
+  // commit() }. commit redesenha e envia (direto, sem confirmação).
+  const eqBind = (sec, param) => ({
+    get: () => eqVal(sec, param()), set: (v) => setPending(sec, param(), v), changed: () => isChanged(sec, param()),
+    enabled: canEditEq, commit: () => { renderEq(); sendEq(); },
+  });
+  /** Linha [rótulo] [−] [valor] [+]. o: ligação + { step(v, dir), fmt, parse } */
   function stepper(text, o) {
     const el = document.createElement("div");
     el.className = "stp";
@@ -860,35 +862,34 @@
     el.querySelector(".stp-l").textContent = text;
     const [minus, plus] = el.querySelectorAll("button");
     const input = el.querySelector("input");
-    const get = () => eqVal(o.sec, o.param());
-    const bump = (dir) => { const v = get(); if (typeof v === "number") { setPending(o.sec, o.param(), o.step(v, dir)); renderEq(); sendEq(); } };
+    input.setAttribute("aria-label", text);
+    const bump = (dir) => { const v = o.get(); if (typeof v === "number") { o.set(o.step(v, dir)); o.commit(); } };
     minus.addEventListener("click", () => bump(-1));
     plus.addEventListener("click", () => bump(1));
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") { e.preventDefault(); input.blur(); }
-      if (e.key === "Escape") { input.value = o.fmt(get()); input.blur(); }
+      if (e.key === "Escape") { input.value = o.fmt(o.get()); input.blur(); }
     });
     input.addEventListener("blur", () => {
-      const v = get();
+      const v = o.get();
       if (v == null || input.value === o.fmt(v)) return;
       const n = o.parse(input.value);
       if (Number.isNaN(n)) { toast(`${text}: valor inválido (“${input.value}”)`, true); input.value = o.fmt(v); return; }
-      setPending(o.sec, o.param(), n);
-      renderEq();
-      sendEq();
+      o.set(n);
+      o.commit();
     });
     return {
       el,
       update() {
-        const v = get(), en = canEditEq() && typeof v === "number";
+        const v = o.get(), en = o.enabled() && typeof v === "number";
         if (document.activeElement !== input) input.value = typeof v === "number" ? o.fmt(v) : "—";
         input.readOnly = !en;
         minus.disabled = plus.disabled = !en;
-        el.classList.toggle("changed", isChanged(o.sec, o.param()));
+        el.classList.toggle("changed", o.changed());
       },
     };
   }
-  /** Botões de escolha (tipo de banda, inclinação). */
+  /** Botões de escolha (tipo de banda, inclinação, modelo, ratio...). o: ligação. */
   function segmented(options, o) {
     const el = document.createElement("div");
     el.className = "seg";
@@ -897,30 +898,30 @@
       b.type = "button";
       b.className = "big";
       b.textContent = text;
-      b.addEventListener("click", () => { setPending(o.sec, o.param(), value); renderEq(); sendEq(); });
+      b.addEventListener("click", () => { o.set(value); o.commit(); });
       el.appendChild(b);
       return [value, b];
     });
     return {
       el,
       update() {
-        const v = eqVal(o.sec, o.param()), en = canEditEq() && v != null;
+        const v = o.get(), en = o.enabled() && v != null;
         for (const [value, b] of btns) { b.classList.toggle("on", value === v); b.disabled = !en; b.setAttribute("aria-pressed", String(value === v)); }
-        el.classList.toggle("changed", isChanged(o.sec, o.param()));
+        el.classList.toggle("changed", o.changed());
       },
     };
   }
-  /** Botão liga/desliga de um parâmetro int 0..1. */
-  function onOff(btn, sec, param, text) {
-    btn.addEventListener("click", () => { const v = eqVal(sec, param); if (v === 0 || v === 1) { setPending(sec, param, v ? 0 : 1); renderEq(); sendEq(); } });
+  /** Botão liga/desliga de um parâmetro int 0..1. o: ligação. */
+  function onOff(btn, o, text) {
+    btn.addEventListener("click", () => { const v = o.get(); if (v === 0 || v === 1) { o.set(v ? 0 : 1); o.commit(); } });
     return {
       update() {
-        const v = eqVal(sec, param);
+        const v = o.get();
         btn.textContent = `${text ? text + " " : ""}${v === 1 ? "ON" : v === 0 ? "OFF" : "—"}`;
         btn.classList.toggle("on", v === 1);
         btn.setAttribute("aria-pressed", String(v === 1));
-        btn.disabled = !canEditEq() || v == null;
-        btn.style.boxShadow = isChanged(sec, param) ? "0 0 0 3px var(--go)" : "";
+        btn.disabled = !o.enabled() || v == null;
+        btn.style.boxShadow = o.changed() ? "0 0 0 3px var(--go)" : "";
       },
     };
   }
@@ -944,11 +945,11 @@
     const card = document.getElementById("eq-band-card");
     card.innerHTML = `<h3 id="eq-band-title"></h3>`;
     const p = (s) => () => selBand + s;
-    const shapeSeg = segmented([["PEQ", "PEQ"], ["SHV", "Shelf"]], { sec: "eq", param: () => (selBand === "l" ? "leq" : "heq") });
+    const shapeSeg = segmented([["PEQ", "PEQ"], ["SHV", "Shelf"]], eqBind("eq", () => (selBand === "l" ? "leq" : "heq")));
     const rows = [
-      stepper("Frequência", { sec: "eq", param: p("f"), step: freqStep, fmt: fmtHz, parse: parseHz }),
-      stepper("Ganho dB", { sec: "eq", param: p("g"), step: (v, d) => v + d * 0.5, fmt: fmtGain, parse: parseNum }),
-      stepper("Q", { sec: "eq", param: p("q"), step: (v, d) => v * Math.pow(2, d / 4), fmt: fmtQ, parse: parseNum }),
+      stepper("Frequência", { ...eqBind("eq", p("f")), step: freqStep, fmt: fmtHz, parse: parseHz }),
+      stepper("Ganho dB", { ...eqBind("eq", p("g")), step: (v, d) => v + d * 0.5, fmt: fmtGain, parse: parseNum }),
+      stepper("Q", { ...eqBind("eq", p("q")), step: (v, d) => v * Math.pow(2, d / 4), fmt: fmtQ, parse: parseNum }),
     ];
     for (const r of rows) card.appendChild(r.el);
     card.appendChild(shapeSeg.el);
@@ -971,9 +972,9 @@
       el.innerHTML = `<h3><span></span><button type="button" class="big toggle"></button></h3><p class="eq-risk"></p>`;
       el.querySelector("h3 span").textContent = title;
       const riskEl = el.querySelector(".eq-risk");
-      const toggle = onOff(el.querySelector("h3 button"), "flt", on, "");
-      const freq = stepper("Frequência", { sec: "flt", param: () => f, step: freqStep, fmt: fmtHz, parse: parseHz });
-      const slope = segmented(slopes.map((v) => [v, v + " dB/oit"]), { sec: "flt", param: () => s });
+      const toggle = onOff(el.querySelector("h3 button"), eqBind("flt", () => on), "");
+      const freq = stepper("Frequência", { ...eqBind("flt", () => f), step: freqStep, fmt: fmtHz, parse: parseHz });
+      const slope = segmented(slopes.map((v) => [v, v + " dB/oit"]), eqBind("flt", () => s));
       el.append(freq.el, slope.el);
       controls.push(toggle, freq, slope, {
         update() {
@@ -984,11 +985,12 @@
         },
       });
     }
-    controls.push(onOff(document.getElementById("eq-on"), "eq", "on", "EQ"));
+    controls.push(onOff(document.getElementById("eq-on"), eqBind("eq", () => "on"), "EQ"));
     document.getElementById("eq-reload").addEventListener("click", () => {
-      if (eqWriter.sending) return toast("Aguarde o envio terminar.", true);
+      if (eqWriter.sending || dynWriter.sending) return toast("Aguarde o envio terminar.", true);
       pending.clear();
-      loadEq(eqCh);
+      dPending.clear();
+      loadCurrentSection(true);
     });
     new ResizeObserver(() => drawEq()).observe(document.getElementById("eq-graph-wrap"));
   }
@@ -1023,16 +1025,18 @@
   }
 
   function selectEqChannel(ch) {
-    if (ch === eqCh && eqData) return;
-    if (eqWriter.sending || drag) return toast("Aguarde o envio terminar.", true);
+    if (ch === eqCh && (eqData || dynData)) return;
+    if (eqWriter.sending || dynWriter.sending || drag || dynDrag) return toast("Aguarde o envio terminar.", true);
     pending.clear();
+    dPending.clear();
     eqStatus.hide();
     eqData = null;
+    dynData = null;
     eqCh = ch;
     try { localStorage.setItem("wing-eq-ch", String(ch)); } catch {}
     if (strips.ch) strips.ch.forEach(updateChip);
     scrollToChip();
-    loadEq(ch);
+    loadCurrentSection(true);
   }
   // Rola só a fileira de canais (scrollIntoView rolaria a página inteira).
   function scrollToChip() {
@@ -1048,8 +1052,7 @@
     if (strips.ch) strips.ch.forEach(updateChip);
     scrollToChip();
     // Sem alterações pendentes, relê ao abrir (a mesa pode ter mudado por fora).
-    if (!pending.size || !eqData || eqData.ch !== eqCh) loadEq(eqCh);
-    else renderEq();
+    loadCurrentSection(false);
   }
 
   async function loadEq(ch) {
@@ -1098,13 +1101,16 @@
     eqPanel.style.setProperty("--cc-ink", inkOn(color));
     document.getElementById("eq-chnum").textContent = `CH ${eqCh}`;
     document.getElementById("eq-chname").textContent = st && st.name ? st.name : "(sem nome)";
-    document.getElementById("eq-model").textContent = eqData && eqData.model ? `EQ ${eqData.model}` : "";
+    const model = chSection === "eq" ? eqData && eqData.model : dynData && dynData.ch === eqCh && dynData[chSection].model;
+    document.getElementById("eq-model").textContent = model ? `${SECTION_LABEL[chSection]} ${model}` : "";
   }
 
   function renderEq() {
     if (eqPanel.hidden) return;
     if (!controls.length) buildEqControls();
     renderEqHead();
+    renderSections();
+    if (chSection !== "eq") return renderDyn();
     const msg = document.getElementById("eq-msg");
     let text = "";
     if (eqError) text = eqError;
@@ -1190,7 +1196,7 @@
   /**
    * Fila de envio de um painel. o: { pending (Map chave -> valor), status, render(), canSend(),
    * held() (arrastando: espera soltar), context(), label(k), command(k, v), risk(k),
-   * extraRisk(k, v), post(k, v) -> postJson, apply(k, readBack) }.
+   * extraRisk(k, v), post(k, v) -> postJson, apply(k, readBack), done()? (fim do envio) }.
    * Envia um por vez; para no primeiro problema e volta a mostrar o que está na mesa.
    */
   function writer(o) {
@@ -1237,8 +1243,341 @@
           const n = cmds.length === 1 ? "1 comando enviado e confirmado" : `${cmds.length} comandos enviados e confirmados`;
           o.status.show(risks.size ? "risk" : "ok", `${o.context()}: ${n} pela mesa (leitura de volta).`, cmds, risks);
         }
+        if (o.done) o.done();
       },
     };
+  }
+
+  // ---------- dinâmica do canal (gate e compressor) ----------
+  // Os controles são montados pela descrição do nó na mesa (/ch/N/gate, /ch/N/dyn): cada modelo
+  // tem parâmetros próprios. Como no EQ, as mudanças vão direto (sem confirmação), validadas
+  // na descrição, uma por vez, com o comando exato e os avisos na barra e leitura de volta.
+  const SECTIONS = [["eq", "EQ"], ["gate", "Gate"], ["dyn", "Compressor"]];
+  const SECTION_LABEL = { eq: "EQ", gate: "Gate", dyn: "Compressor" };
+  const DYN_LABELS = { thr: "Threshold", range: "Alcance", att: "Attack", hld: "Hold", rel: "Release", ratio: "Ratio",
+    knee: "Knee", gain: "Makeup", mix: "Mix", det: "Detector", env: "Envelope", auto: "Auto", acc: "Accent" };
+  let chSection = "eq";
+  try { chSection = localStorage.getItem("wing-ch-section") || "eq"; } catch {}
+  // Link direto: #gate/5 e #dyn/5 abrem o gate e o compressor do CH 5 (#eq/5 abre o EQ).
+  const dynHash = /^#(gate|dyn)(?:\/(\d+))?$/.exec(location.hash);
+  if (dynHash) {
+    active = "eq";
+    chSection = dynHash[1];
+    if (dynHash[2] && Number(dynHash[2]) >= 1 && Number(dynHash[2]) <= 40) eqCh = Number(dynHash[2]);
+  } else if (eqHash) chSection = "eq";
+  if (!SECTION_LABEL[chSection]) chSection = "eq";
+  let dynData = null, dynError = null, dynToken = 0, dynDrag = null, dynBuilt = "", dynReload = false;
+  const dPending = new Map(); // "gate/thr" -> valor
+  let dynControls = [];
+  let DG = { w: 400, h: 260, lo: -60, hi: 12 };
+
+  const dynParam = (sec, n) => (dynData && dynData[sec] ? dynData[sec].params.find((p) => p.name === n) : undefined);
+  const dynCur = (sec, n) => { const d = dynParam(sec, n); return d ? d.value : null; };
+  const dynVal = (sec, n) => (dPending.has(`${sec}/${n}`) ? dPending.get(`${sec}/${n}`) : dynCur(sec, n));
+  const canEditDyn = () => writable() && !!dynData && dynData.ch === eqCh && !!curveLib;
+  const dynLabel = (n) => DYN_LABELS[n] || n;
+
+  function setDynPending(sec, n, v) {
+    const d = dynParam(sec, n);
+    if (!d || d.readOnly || !canEditDyn() || v == null || (typeof v === "number" && !Number.isFinite(v))) return;
+    if (typeof v === "number") v = normalizeNum(d, v);
+    const k = `${sec}/${n}`;
+    if (sameValue(d, v, d.value)) dPending.delete(k);
+    else dPending.set(k, v);
+  }
+  const dynBind = (n) => ({
+    get: () => dynVal(chSection, n), set: (v) => setDynPending(chSection, n, v),
+    changed: () => dPending.has(`${chSection}/${n}`),
+    enabled: () => canEditDyn() && !!dynParam(chSection, n) && !dynParam(chSection, n).readOnly,
+    commit: () => { renderEq(); sendDyn(); },
+  });
+  /** Passo do −/+: ~80 toques cobrem a faixa (no passo que a mesa descreveu). */
+  function stepFor(d) {
+    if (d.type === "int") return (v, dir) => v + dir;
+    const n = d.steps && d.steps > 1 ? d.steps - 1 : 100;
+    const k = Math.max(1, Math.round(n / 80));
+    if (d.type === "log" && d.min > 0) { const r = Math.pow(d.max / d.min, k / n); return (v, dir) => v * Math.pow(r, dir); }
+    const step = ((d.max - d.min) / n) * k;
+    return (v, dir) => v + dir * step;
+  }
+  function fmtFor(d) {
+    const step = d.steps > 1 ? (d.max - d.min) / (d.steps - 1) : 1;
+    return (v) => {
+      if (typeof v !== "number") return "—";
+      if (d.type === "fader" && v <= -144) return "-∞";
+      if (d.unit === "Hz" && v >= 1000) return fmtHz(v);
+      const dec = d.type === "int" ? 0 : d.type === "log" ? (v < 10 ? 2 : v < 100 ? 1 : 0) : step < 0.1 ? 2 : step < 1 ? 1 : 0;
+      return v.toFixed(dec);
+    };
+  }
+  const parseFor = (d) => (d.unit === "Hz" ? parseHz : d.type === "fader" ? parseDb : parseNum);
+
+  const dynWriter = writer({
+    pending: dPending, status: eqStatus, render: renderEq,
+    canSend: canEditDyn, held: () => !!dynDrag,
+    context: () => `CH ${eqCh}`,
+    label: (k) => { const [sec, n] = k.split("/"); return `${SECTION_LABEL[sec]} · ${dynLabel(n)}`; },
+    command: (k, v) => { const [sec, n] = k.split("/"); return oscText(`/ch/${eqCh}/${sec}/${n}`, eqTag(dynParam(sec, n)), v); },
+    risk: (k) => { const [sec, n] = k.split("/"); const d = dynParam(sec, n); return d && d.risk; },
+    extraRisk: (k, v) => {
+      const [sec, n] = k.split("/"), cur = dynCur(sec, n);
+      return sec === "dyn" && n === "gain" && typeof cur === "number" && v > cur + 6 ? "Reforço de mais de 6 dB no ganho de maquiagem." : null;
+    },
+    post: (k, v) => { const [sec, n] = k.split("/"); return postJson(`/api/channels/${eqCh}/${sec}`, { param: n, value: v }); },
+    apply: (k, readBack) => {
+      const [sec, n] = k.split("/"), d = dynParam(sec, n);
+      if (d) applyEqValue(d, readBack);
+      if (n === "mdl") dynReload = true; // outro modelo pode ter outros parâmetros
+    },
+    done: () => { if (dynReload) { dynReload = false; loadDyn(eqCh); } },
+  });
+  const sendDyn = () => dynWriter.flush();
+
+  function renderSections() {
+    const box = document.getElementById("ch-sections");
+    if (!box.childElementCount) {
+      for (const [k, t] of SECTIONS) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "big";
+        b.dataset.sec = k;
+        b.textContent = t;
+        b.addEventListener("click", () => selectSection(k));
+        box.appendChild(b);
+      }
+    }
+    for (const b of box.children) {
+      b.classList.toggle("on", b.dataset.sec === chSection);
+      b.setAttribute("aria-pressed", String(b.dataset.sec === chSection));
+    }
+    document.getElementById("eq-view").hidden = chSection !== "eq";
+    document.getElementById("dyn-view").hidden = chSection === "eq";
+    document.getElementById("eq-on").hidden = chSection !== "eq";
+  }
+  function selectSection(k) {
+    if (k === chSection) return;
+    if (eqWriter.sending || dynWriter.sending || drag || dynDrag) return toast("Aguarde o envio terminar.", true);
+    chSection = k;
+    try { localStorage.setItem("wing-ch-section", k); } catch {}
+    eqStatus.hide();
+    loadCurrentSection(false);
+  }
+  /** Lê a seção aberta (EQ ou dinâmica); sem pendentes, relê para pegar mudanças feitas por fora. */
+  function loadCurrentSection(force) {
+    if (chSection === "eq") {
+      if (force || !pending.size || !eqData || eqData.ch !== eqCh) loadEq(eqCh);
+      else renderEq();
+    } else if (force || !dPending.size || !dynData || dynData.ch !== eqCh) loadDyn(eqCh);
+    else renderEq();
+  }
+
+  async function loadDyn(ch) {
+    const token = ++dynToken;
+    dynError = null;
+    renderEq();
+    try {
+      const res = await fetch(`/api/channels/${ch}/dyn`);
+      const data = await res.json();
+      if (token !== dynToken) return;
+      if (!res.ok) throw new Error(data.error);
+      dynData = data;
+    } catch (e) {
+      if (token !== dynToken) return;
+      dynError = "Não foi possível ler a dinâmica da mesa: " + e.message;
+    }
+    renderEq();
+  }
+
+  /** Monta os controles da seção a partir da descrição (só refaz se os parâmetros mudarem). */
+  function buildDynControls() {
+    const sec = chSection, data = dynData && dynData.ch === eqCh ? dynData[sec] : null;
+    const key = data ? `${dynData.ch}/${sec}/${data.params.map((d) => `${d.name}:${d.type}:${(d.options || []).join(",")}`).join("|")}` : "";
+    if (key === dynBuilt) return;
+    dynBuilt = key;
+    dynControls = [];
+    const top = document.getElementById("dyn-top"), box = document.getElementById("dyn-params");
+    top.replaceChildren();
+    box.replaceChildren();
+    if (!data) return;
+    if (dynParam(sec, "on")) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "big toggle";
+      top.appendChild(b);
+      dynControls.push(onOff(b, dynBind("on"), SECTION_LABEL[sec]));
+    }
+    const mdl = dynParam(sec, "mdl");
+    if (mdl && mdl.options && !mdl.readOnly) {
+      const m = segmented(mdl.options.map((o) => [o, o]), dynBind("mdl"));
+      m.el.setAttribute("aria-label", "Modelo");
+      top.appendChild(m.el);
+      dynControls.push(m);
+    }
+    for (const d of data.params) {
+      if (d.name === "on" || d.name === "mdl" || d.type === "string") continue;
+      const n = d.name;
+      const item = document.createElement("div");
+      item.className = "dyn-item";
+      const title = `${dynLabel(n)}${d.unit ? " " + d.unit : ""}`;
+      let ctl;
+      if (d.readOnly || d.type === "list" || (d.type === "int" && d.min === 0 && d.max === 1)) {
+        const h = document.createElement("h4");
+        h.innerHTML = "<span></span>";
+        h.firstChild.textContent = title;
+        item.appendChild(h);
+        if (d.readOnly) {
+          const span = document.createElement("span");
+          span.className = "dyn-ro";
+          h.appendChild(span);
+          const fmt = fmtFor(d);
+          ctl = { update() { const v = dynCur(sec, n); span.textContent = `${typeof v === "number" ? fmt(v) : v ?? "—"} (somente leitura)`; } };
+        } else if (d.type === "list") {
+          ctl = segmented(d.options.map((o) => [o, o]), dynBind(n));
+          item.appendChild(ctl.el);
+        } else {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "big toggle";
+          h.appendChild(b);
+          ctl = onOff(b, dynBind(n), "");
+        }
+      } else {
+        ctl = stepper(title, { ...dynBind(n), step: stepFor(d), fmt: fmtFor(d), parse: parseFor(d) });
+        item.appendChild(ctl.el);
+      }
+      dynControls.push({ update() { ctl.update(); item.classList.toggle("changed", dPending.has(`${sec}/${n}`)); } });
+      box.appendChild(item);
+    }
+  }
+
+  function renderDyn() {
+    const msg = document.getElementById("eq-msg");
+    const ready = dynData && dynData.ch === eqCh;
+    msg.textContent = dynError ? dynError : !ready ? `Lendo ${SECTION_LABEL[chSection].toLowerCase()} do CH ${eqCh} na mesa…`
+      : !writable() ? "Somente leitura: dá para ver a dinâmica, mas mudanças pedem WING_ALLOW_WRITES=1." : "";
+    msg.classList.toggle("err", !!dynError);
+    buildDynControls();
+    for (const c of dynControls) c.update();
+    drawDyn();
+    renderGr();
+  }
+
+  /** Saída (dB) para uma entrada x, pela curva do gate ou do compressor. Aproximação para a tela. */
+  function transferDb(sec, x, get) {
+    const num = (n) => { const v = get(sec, n); return typeof v === "number" ? v : null; };
+    const thr = num("thr");
+    if (thr == null || num("on") !== 1) return x;
+    if (sec === "dyn") {
+      const r = Number(get(sec, "ratio")) || 1, knee = (num("knee") ?? 0) * 3, gain = num("gain") ?? 0;
+      let y;
+      if (get(sec, "mdl") === "EXP") y = x >= thr ? x : thr + (x - thr) * r; // expansor: age abaixo do threshold
+      else if (knee > 0 && Math.abs(x - thr) <= knee / 2) y = x + ((1 / r - 1) * Math.pow(x - thr + knee / 2, 2)) / (2 * knee);
+      else y = x <= thr ? x : thr + (x - thr) / r;
+      return y + gain;
+    }
+    if (x >= thr) return x;
+    const range = num("range") ?? 60;
+    const m = /^1:([\d.]+)$/.exec(String(get(sec, "ratio") ?? ""));
+    return m ? Math.max(x - range, thr + (x - thr) * Number(m[1])) : x - range;
+  }
+
+  function drawDyn() {
+    if (eqPanel.hidden || chSection === "eq") return;
+    const svgD = document.getElementById("dyn-graph");
+    const sec = chSection;
+    const w = Math.max(200, Math.round(document.getElementById("dyn-graph-wrap").clientWidth - 4));
+    const h = Math.round(clamp(w * 0.62, 200, 360));
+    const lo = sec === "gate" ? -80 : -60, hi = sec === "dyn" ? 12 : 0;
+    DG = { w, h, lo, hi };
+    const X = (db) => ((db - lo) / -lo) * w, Y = (db) => h - ((db - lo) / (hi - lo)) * h;
+    svgD.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    svgD.setAttribute("width", w);
+    svgD.setAttribute("height", h);
+    let s = "";
+    for (let db = lo; db <= 0; db += 10) {
+      const x = X(db);
+      s += `<line class="g${db % 20 === 0 ? " g-major" : ""}" x1="${x}" x2="${x}" y1="0" y2="${h}"/>`;
+      if (db > lo && db < 0) s += `<text class="gl" x="${x + 3}" y="${h - 6}">${db}</text>`;
+    }
+    for (let db = lo + 10; db <= hi; db += 10) {
+      const y = Y(db);
+      s += `<line class="g${db === 0 ? " g-major" : ""}" x1="0" x2="${w}" y1="${y}" y2="${y}"/><text class="gl" x="4" y="${y - 4}">${db}</text>`;
+    }
+    s += `<text class="gl" x="${w - 92}" y="${h - 20}">entrada (dB)</text><text class="gl" x="34" y="14">saída (dB)</text>`;
+    s += `<line class="unity" x1="${X(lo)}" y1="${Y(lo)}" x2="${X(0)}" y2="${Y(0)}"/>`;
+    if (dynData && dynData.ch === eqCh) {
+      const path = (get) => {
+        let d = "";
+        for (let i = 0; i <= 160; i++) {
+          const x = lo + (-lo * i) / 160;
+          d += `${i ? "L" : "M"}${X(x).toFixed(1)},${clamp(Y(transferDb(sec, x, get)), -4, h + 4).toFixed(1)}`;
+        }
+        return d;
+      };
+      if ([...dPending.keys()].some((k) => k.startsWith(sec + "/"))) s += `<path class="c-old" d="${path(dynCur)}"/>`;
+      s += `<path class="c-main" d="${path(dynVal)}"/>`;
+      const thr = dynVal(sec, "thr");
+      if (typeof thr === "number") {
+        const x = X(thr), y = clamp(Y(transferDb(sec, thr, dynVal)), 14, h - 14);
+        s += `<line class="thr" x1="${x}" x2="${x}" y1="0" y2="${h}"/><circle class="thr-h" cx="${x}" cy="${y}" r="12"/>` +
+          `<text class="thr-t" x="${clamp(x + 10, 4, w - 110)}" y="30">thr ${thr.toFixed(1)} dB</text>`;
+      }
+    }
+    svgD.innerHTML = s;
+    svgD.classList.toggle("dim", dynVal(sec, "on") === 0);
+  }
+
+  // Arrastar na curva (para os lados) muda o threshold; é relativo: tocar sem mover não muda nada.
+  const dynSvg = document.getElementById("dyn-graph");
+  dynSvg.addEventListener("pointerdown", (e) => {
+    const thr = dynVal(chSection, "thr"), d = dynParam(chSection, "thr");
+    if (!canEditDyn() || typeof thr !== "number" || !d || d.readOnly) return;
+    e.preventDefault();
+    try { dynSvg.setPointerCapture(e.pointerId); } catch {}
+    dynDrag = { id: e.pointerId, x0: e.clientX, t0: thr, w: dynSvg.getBoundingClientRect().width };
+  });
+  dynSvg.addEventListener("pointermove", (e) => {
+    if (!dynDrag || e.pointerId !== dynDrag.id) return;
+    setDynPending(chSection, "thr", dynDrag.t0 + ((e.clientX - dynDrag.x0) / dynDrag.w) * -DG.lo);
+    renderEq();
+    dynWriter.preview();
+  });
+  const endDynDrag = (e) => { if (dynDrag && e.pointerId === dynDrag.id) { dynDrag = null; sendDyn(); } };
+  dynSvg.addEventListener("pointerup", endDynDrag);
+  dynSvg.addEventListener("pointercancel", endDynDrag);
+  new ResizeObserver(() => drawDyn()).observe(document.getElementById("dyn-graph-wrap"));
+
+  /**
+   * Medidor de redução de ganho: palavras 5 (gate) e 7 (compressor) do medidor do canal
+   * (Table 5), em dB com 0 = sem redução. Mapa ainda não conferido na mesa real.
+   */
+  function renderGr() {
+    if (eqPanel.hidden || chSection === "eq") return;
+    const st = strips.ch && strips.ch[eqCh - 1];
+    const g = st && st.meter ? st.meter[chSection] : undefined;
+    const red = typeof g === "number" ? Math.max(0, -g) : null;
+    const range = dynVal("gate", "range");
+    const full = chSection === "gate" ? (typeof range === "number" ? range : 60) : 24;
+    document.getElementById("dyn-gr-fill").style.height = red == null ? "0%" : `${Math.min(100, (red / full) * 100)}%`;
+    document.getElementById("dyn-gr-val").textContent = red == null ? "—" : red < 0.05 ? "0.0 dB" : `−${red.toFixed(1)} dB`;
+    document.getElementById("dyn-gr-l").textContent = chSection === "gate" ? "Gate: redução" : "Redução";
+  }
+
+  const DYN_PATH = /^\/ch\/(\d+)\/(gate|dyn)\/([^/]+)$/;
+  function onDynParam(path, value) {
+    const m = DYN_PATH.exec(path);
+    if (!m || !dynData || Number(m[1]) !== dynData.ch) return;
+    const d = dynParam(m[2], m[3]);
+    if (!d) return;
+    // Outro modelo pode ter outros parâmetros: relê o nó.
+    if (m[3] === "mdl" && value.kind === "string" && value.text !== d.value) {
+      if (!dynWriter.sending) loadDyn(dynData.ch);
+      return;
+    }
+    applyEqValue(d, value);
+    const k = `${m[2]}/${m[3]}`;
+    if (dPending.has(k) && sameValue(d, dPending.get(k), d.value)) dPending.delete(k);
+    if (active === "eq" && chSection === m[2]) renderEq();
   }
 
   // ---------- visão de sends ----------
@@ -1653,7 +1992,7 @@
     showTab(active);
   });
   es.addEventListener("strip", (e) => { if (kinds.length) render(JSON.parse(e.data)); });
-  es.addEventListener("param", (e) => { const p = JSON.parse(e.data); onEqParam(p.path, p.value); onSendParam(p.path, p.value); });
+  es.addEventListener("param", (e) => { const p = JSON.parse(e.data); onEqParam(p.path, p.value); onDynParam(p.path, p.value); onSendParam(p.path, p.value); });
   es.addEventListener("status", (e) => { lastStatus = JSON.parse(e.data); renderStatus(lastStatus); });
   es.addEventListener("meters", (e) => {
     const all = JSON.parse(e.data);
@@ -1661,6 +2000,7 @@
       if (!strips[kind]) continue;
       list.forEach((m, i) => { const st = strips[kind][i]; if (st) { st.meter = m; renderMeter(st); } });
     }
+    renderGr();
     if (lastStatus) { lastStatus.lastMeterAt = Date.now(); renderStatus(lastStatus); }
   });
   setInterval(async () => {
