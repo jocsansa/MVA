@@ -201,6 +201,71 @@ Ainda não conferido na mesa real: a lista exata de parâmetros de cada modelo (
 usa uma versão plausível) e o mapa das palavras 5 e 7 do medidor como ganho do gate e do
 compressor.
 
+### Gravação das sessões (captura das mixagens)
+
+Aba **SESSÕES**. O operador escreve o nome (sem login), marca o momento do culto (Pré-culto,
+Louvor, Ministração, Pregação, Ofertório, Avisos, Final) e inicia a gravação. Enquanto grava,
+a pílula vermelha **REC** fica no topo de todas as abas. Mesmo desenho da caixa-preta do
+automix: um arquivo JSONL por culto, uma linha por evento, em `data/sessions/culto-AAAA-MM-DD_HH-MM-SS.jsonl`
+(pasta configurável com `SESSIONS_DIR`; fora do git).
+
+- **Só leitura.** Funciona em somente leitura (sem `WING_ALLOW_WRITES`). O gravador escuta o
+  que a mesa já manda (assinatura `/*s`, GETs e medidores) e, ao iniciar, lê EQ, filtro,
+  gate e compressor dos 40 canais pela descrição dos nós. Nunca envia comando para a mesa.
+- **Eventos:** `session` (data, operador, momento, mesa), `snapshot` (fader, mute, solo, pan e
+  ganho de todos os strips), `proc` (EQ/filtro/gate/compressor de cada canal), `change`
+  (fader, mute, solo, pan, ganho, EQ, dinâmica e nome, com valor anterior; valor repetido não
+  grava), `moment`, `meters` (pico de cada strip a cada segundo), `conn`, `alert` (alerta
+  disparado, resolvido ou dispensado) e `session-end`.
+- **Rotação:** guarda as últimas `SESSIONS_KEEP` sessões (padrão 60) e no máximo
+  `SESSIONS_MAX_MB` somados (padrão 500); apaga as mais antigas ao iniciar uma sessão. Uma
+  sessão esquecida aberta é encerrada sozinha depois de 6 h.
+- Servidor encerrado com Ctrl+C fecha a sessão. Se o processo cair, o arquivo fica sem a
+  linha de fim e a lista mostra **INTERROMPIDA**, com a duração até o último evento.
+
+| Rota | O que faz |
+|---|---|
+| `GET /api/sessions` | Gravação em andamento, momentos e lista das sessões (data, operador, duração, tamanho) |
+| `GET /api/sessions/<id>` | Registro bruto (JSONL) de uma sessão |
+| `POST /api/sessions/start` `{operator, moment}` | Inicia a gravação |
+| `POST /api/sessions/moment` `{moment}` | Marca o momento do culto |
+| `POST /api/sessions/stop` | Encerra a gravação |
+
+### Alertas ao vivo
+
+Durante o culto o app avisa o operador quando algo está errado, com o passo a passo para
+corrigir na mesa. Só leitura: os alertas olham os medidores e o estado dos canais e **nunca
+escrevem na mesa**. Desenho das regras do automix, adaptado para a WING.
+
+| Regra | Nível | Espera | Condição |
+|---|---|---|---|
+| Mesa desconectada | crítico | imediato | Sem resposta OSC por 12 s ou sem medidores por 3 s |
+| Canal mutado com sinal | crítico | 2 s | Mute ligado, fader aberto (acima de -50 dB) e entrada acima de -45 dB |
+| Clip | aviso | imediato | Entrada em -0,5 dBFS ou acima; sai 10 s depois do último pico |
+| Canal sem sinal | aviso | 30 s | Canal aberto (sem mute, fader acima de -50 dB) com entrada abaixo de -60 dB; não vale no pré-culto. Passos de sem fio (bateria, receptor) ou com fio (cabo, phantom) |
+| MAIN LR sem sinal | crítico | 5 s | Algum canal aberto sai com sinal, mas o MAIN 1 está abaixo de -60 dB |
+
+- **Entrada do canal:** as regras de mute, clip e canal sem sinal usam a entrada (palavras 0
+  e 1 do medidor da WING, antes do fader e do mute). O MAIN usa a saída dos canais.
+  As regras olham o pico dos últimos 500 ms, avaliado a cada 250 ms.
+- **Uma vez por ocorrência:** cada alerta dispara uma vez, fica na tela enquanto a condição
+  durar e some sozinho quando ela resolve. **Dispensar** tira da tela; o alerta só volta se a
+  condição sumir e aparecer de novo. Com a mesa desconectada os outros alertas ficam congelados.
+- **Tela:** cartões no topo (crítico em vermelho, aviso em âmbar) com "O que fazer", um "!" no
+  strip do canal e a pílula de alertas no topo, que abre o histórico da sessão (disparou,
+  resolvido, dispensado). Com gravação em andamento, cada alerta entra no registro da sessão.
+- **Limites:** todos em `ALERT_LIMITS`, em [src/alerts.ts](src/alerts.ts) (níveis, tempos de espera,
+  canais sem fio, canais ignorados). **Calibração com a WING real pendente:** os valores vêm do
+  automix e ainda não foram conferidos com os níveis reais da igreja.
+
+| Rota | O que faz |
+|---|---|
+| `GET /api/alerts` | Alertas ativos, histórico e limites |
+| `POST /api/alerts/dismiss` `{id}` | Dispensa um alerta (só some da tela) |
+
+No simulador os canais 1 a 20 têm fonte, e a entrada sobe com o ganho: ganho no máximo faz o
+canal clipar. Os canais 21 a 40 não têm fonte. Abrir um deles provoca "canal sem sinal".
+
 ### Comandar pelo chat (Claude Code)
 
 As rotas acima são HTTP local, então o Claude Code pode operar a mesa a pedido no chat

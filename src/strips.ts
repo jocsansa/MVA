@@ -40,6 +40,8 @@ export interface StripMeter {
   /** Só canais: ganho aplicado pelo gate e pelo compressor em dB (0 = sem redução). */
   gate?: number;
   dyn?: number;
+  /** Só canais: nível de entrada em dBFS (maior de L/R), antes do fader e do mute. */
+  in?: number;
 }
 
 export interface StripState {
@@ -133,6 +135,13 @@ export function channelDynFromWords(words: number[]): { gate: number; dyn: numbe
   return gate === undefined || dyn === undefined ? null : { gate, dyn };
 }
 
+/** Canal: palavras 0 e 1 = entrada L/R (Table 5), antes do fader e do mute. Usado pelos alertas. */
+export function channelInputFromWords(words: number[]): { in: number } | null {
+  const l = words[0];
+  const r = words[1];
+  return l === undefined || r === undefined ? null : { in: Math.max(l, r) };
+}
+
 /** Report id da coleção única de medidores. */
 export const METER_REPORT_ID = 1;
 
@@ -162,7 +171,7 @@ export function splitMeterPacket(packet: Buffer): { kind: StripKind; index: numb
       const vals: number[] = [];
       for (let w = 0; w < words; w++) vals.push(packet.readInt16BE(off + w * 2) / 256);
       const meter = stripMeterFromWords(vals);
-      if (meter && k.kind === "ch") Object.assign(meter, channelDynFromWords(vals));
+      if (meter && k.kind === "ch") Object.assign(meter, channelDynFromWords(vals), channelInputFromWords(vals));
       out.push({ kind: k.kind, index: i, meter });
       off += words * 2;
     }

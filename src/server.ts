@@ -21,6 +21,8 @@ import { EqRequestError, readChannelEq, writeChannelEq } from "./eq.ts";
 import { DynRequestError, readChannelDyn, writeChannelDyn } from "./dyn.ts";
 import { STRIP_KINDS } from "./strips.ts";
 import { buildSendRows, destKey, parseDest, sendPaths, writeSend } from "./sends.ts";
+import { MOMENTS, SessionError, SessionRecorder } from "./recorder.ts";
+import { ALERT_LIMITS, AlertEngine, MeterWindow, alertContext, type Alert } from "./alerts.ts";
 
 const host = process.env.CONSOLE_HOST;
 if (!host) {
@@ -34,6 +36,58 @@ const indexPath = fileURLToPath(new URL("../public/index.html", import.meta.url)
 const allowWrites = process.env.WING_ALLOW_WRITES === "1";
 const wing = new WingClient(host, { allowWrites });
 const clients = new Set<http.ServerResponse>();
+
+// Gravação das sessões: só escuta a mesa e grava em disco (data/sessions, ou SESSIONS_DIR).
+const sessionsDir = process.env.SESSIONS_DIR ?? fileURLToPath(new URL("../data/sessions", import.meta.url));
+const recorder = new SessionRecorder({
+  dir: sessionsDir,
+  keep: Number(process.env.SESSIONS_KEEP ?? 60),
+  maxBytes: Number(process.env.SESSIONS_MAX_MB ?? 500) * 1024 * 1024,
+  strips: () => wing.strips,
+  console: () => ({
+    host,
+    info: wing.status.consoleInfo,
+    connected: wing.status.lastOscAt !== null && Date.now() - wing.status.lastOscAt < 15000,
+  }),
+  describe: (path) => wing.describeNode(path),
+  onChange: (active) => {
+    if (active && active.id !== sessionId) {
+      // Sessão nova: histórico de alertas novo, e os alertas já na tela entram no registro.
+      alerts.resetHistory();
+      for (const a of alerts.list()) recorder.note(alertEntry("active", a));
+      broadcastAlerts();
+    }
+    sessionId = active?.id ?? null;
+    broadcast("session", active);
+  },
+});
+let sessionId: string | null = null;
+wing.on("osc", (path, value) => recorder.onOsc(path, value));
+wing.on("meters", (strips) => recorder.onMeters(strips));
+
+// Alertas ao vivo: só leem os medidores e o estado dos canais e avisam. Limites em ALERT_LIMITS (src/alerts.ts).
+const alerts = new AlertEngine();
+const meterWindow = new MeterWindow();
+const startedAt = Date.now();
+wing.on("meters", (strips) => meterWindow.push(Date.now(), strips));
+const alertEntry = (action: string, a: Alert) =>
+  ({ type: "alert", action, key: a.key, level: a.level, title: a.title, ...(a.channel ? { channel: a.channel } : {}) });
+const alertState = () => ({ active: alerts.list(), history: alerts.history() });
+function broadcastAlerts(): void {
+  broadcast("alerts", alertState());
+}
+// Relógio próprio (como no automix): a queda da mesa só aparece pela falta de mensagens.
+setInterval(() => {
+  const t = Date.now();
+  const ctx = alertContext(t, wing.strips, meterWindow, wing.status, startedAt, recorder.current?.moment ?? null);
+  const { raised, cleared } = alerts.update(ctx);
+  for (const a of raised) {
+    recorder.note(alertEntry("raised", a));
+    console.log(`Alerta (${a.level}): ${a.title}`);
+  }
+  for (const a of cleared) recorder.note(alertEntry("cleared", a));
+  if (raised.length || cleared.length) broadcastAlerts();
+}, 250);
 
 function broadcast(event: string, data: unknown): void {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -81,14 +135,43 @@ const DYN_READ_ROUTE = /^\/api\/channels\/(\d+)\/dyn$/;
 const writeErrorCode = (msg: string) => (msg.startsWith("Sem resposta") ? 502 : 400);
 const curvePath = fileURLToPath(new URL("../public/eq-curve.js", import.meta.url));
 
+/** Exige JSON e origem local: impede que outro site no navegador dispare pedidos POST. */
+function isLocalJson(req: http.IncomingMessage): boolean {
+  const origin = req.headers.origin;
+  return !!req.headers["content-type"]?.startsWith("application/json") &&
+    (!origin || origin === `http://localhost:${port}` || origin === `http://127.0.0.1:${port}`);
+}
+
+const SESSION_ROUTE = /^\/api\/sessions\/([\w-]+)$/;
+
+/** Gravação: iniciar, marcar momento e encerrar. Não fala com a mesa, então vale também em somente leitura. */
+async function handleSession(req: http.IncomingMessage, res: http.ServerResponse, action: string): Promise<void> {
+  if (!isLocalJson(req)) return sendJson(res, 403, { error: "Requisição recusada" });
+  const body = (await readJson(req)) as { operator?: unknown; moment?: unknown };
+  try {
+    if (action === "start") return sendJson(res, 200, { active: recorder.start(body.operator, body.moment) });
+    if (action === "moment") return sendJson(res, 200, { active: recorder.setMoment(body.moment) });
+    if (action === "stop") return sendJson(res, 200, { session: recorder.stop() });
+    return sendJson(res, 404, { error: "não encontrado" });
+  } catch (e) {
+    return sendJson(res, e instanceof SessionError ? e.code : 500, { error: (e as Error).message });
+  }
+}
+
+/** Dispensar um alerta: só some da tela (não fala com a mesa); volta se a condição sumir e aparecer de novo. */
+async function handleDismiss(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  if (!isLocalJson(req)) return sendJson(res, 403, { error: "Requisição recusada" });
+  const body = (await readJson(req)) as { id?: unknown };
+  const alert = typeof body.id === "string" ? alerts.dismiss(body.id) : undefined;
+  if (!alert) return sendJson(res, 404, { error: "Alerta não está ativo" });
+  recorder.note(alertEntry("dismissed", alert));
+  broadcastAlerts();
+  sendJson(res, 200, { dismissed: alert.id });
+}
+
 async function handleWrite(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<void> {
   if (!allowWrites) return sendJson(res, 403, { error: "Escrita desativada (WING_ALLOW_WRITES=1)" });
-  // Exige JSON e origem local: impede que outro site no navegador dispare escritas.
-  const origin = req.headers.origin;
-  if (!req.headers["content-type"]?.startsWith("application/json") ||
-      (origin && origin !== `http://localhost:${port}` && origin !== `http://127.0.0.1:${port}`)) {
-    return sendJson(res, 403, { error: "Requisição recusada" });
-  }
+  if (!isLocalJson(req)) return sendJson(res, 403, { error: "Requisição recusada" });
   if (url.pathname === "/api/param") {
     const body = (await readJson(req)) as { path?: unknown; value?: unknown };
     if (typeof body.path !== "string" || !isSafePath(body.path)) return sendJson(res, 400, { error: "Caminho inválido" });
@@ -175,7 +258,10 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://localhost");
   if (req.method === "POST") {
     try {
-      await handleWrite(req, res, url);
+      const ses = SESSION_ROUTE.exec(url.pathname);
+      if (ses) await handleSession(req, res, ses[1]!);
+      else if (url.pathname === "/api/alerts/dismiss") await handleDismiss(req, res);
+      else await handleWrite(req, res, url);
     } catch (e) {
       sendJson(res, 500, { error: (e as Error).message });
     }
@@ -253,6 +339,19 @@ const server = http.createServer(async (req, res) => {
     } catch (e) {
       sendJson(res, 400, { error: (e as Error).message });
     }
+  } else if (url.pathname === "/api/alerts") {
+    sendJson(res, 200, { ...alertState(), limits: ALERT_LIMITS });
+  } else if (url.pathname === "/api/sessions") {
+    sendJson(res, 200, { active: recorder.current, moments: MOMENTS, dir: sessionsDir, sessions: recorder.list() });
+  } else if (SESSION_ROUTE.test(url.pathname)) {
+    // Registro bruto da sessão (JSONL), uma linha por evento.
+    try {
+      const text = recorder.read(SESSION_ROUTE.exec(url.pathname)![1]!);
+      res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
+      res.end(text);
+    } catch (e) {
+      sendJson(res, e instanceof SessionError ? e.code : 500, { error: (e as Error).message });
+    }
   } else if (url.pathname === "/api/state") {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify(snapshot()));
@@ -263,6 +362,8 @@ const server = http.createServer(async (req, res) => {
       connection: "keep-alive",
     });
     res.write(`event: state\ndata: ${JSON.stringify(snapshot())}\n\n`);
+    res.write(`event: session\ndata: ${JSON.stringify(recorder.current)}\n\n`);
+    res.write(`event: alerts\ndata: ${JSON.stringify(alertState())}\n\n`);
     clients.add(res);
     req.on("close", () => clients.delete(res));
   } else {
@@ -287,6 +388,7 @@ await wing.start();
 
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
+    recorder.close();
     wing.close();
     server.close();
     process.exit(0);

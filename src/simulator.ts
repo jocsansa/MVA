@@ -436,8 +436,17 @@ setInterval(() => {
       const silent = mute === 1 || fdr === -144 || (l.kind === "ch" && l.index > 20);
       const level = silent ? -128 : -30 + 12 * Math.sin(t * 2 + l.index) + (typeof fdr === "number" ? fdr / 3 : 0);
       const words = Array.from({ length: l.words }, (_, w) => Math.max(-128, level - (w % 2) * 1.5));
-      // Canal: palavra 5 = ganho do gate, 7 = ganho do compressor (Table 5), em dB (0 = sem redução).
-      if (l.kind === "ch" && l.words >= 8) [words[5], words[7]] = dynGains(l.index, silent ? -128 : level + 10);
+      if (l.kind === "ch" && l.words >= 8) {
+        // Entrada (palavras 0 e 1): o sinal da fonte, antes do fader e do mute. Canais 1..20 têm
+        // fonte; o ganho acima de 20,5 dB sobe a entrada (com ganho alto o canal clipa em 0 dBFS).
+        const g = values.get(`/ch/${l.index}/in/set/$g`);
+        const input = l.index > 20 ? -128
+          : Math.min(0, -30 + 12 * Math.sin(t * 2 + l.index) + (typeof g === "number" ? g - 20.5 : 0));
+        words[0] = input;
+        words[1] = Math.max(-128, input - 1.5);
+        // Palavra 5 = ganho do gate, 7 = ganho do compressor (Table 5), em dB (0 = sem redução).
+        [words[5], words[7]] = dynGains(l.index, silent ? -128 : level + 10);
+      }
       words.forEach((v, w) => pkt.writeInt16BE(Math.round(v * 256), off + w * 2));
       off += l.words * 2;
     }

@@ -162,6 +162,7 @@ test("medidor do canal: ganho do gate (palavra 5) e do compressor (palavra 7)", 
   // CH 1: saída -10/-11, gate -6, compressor -3; o resto zerado. AUX 1 vem logo depois dos 40 canais.
   for (const [w, db] of [[2, -10], [3, -11], [5, -6], [7, -3]] as const) pkt.writeInt16BE(db * 256, 4 + w * 2);
   const out = splitMeterPacket(pkt)!;
-  assert.deepEqual(out[0], { kind: "ch", index: 1, meter: { l: -10, r: -11, gate: -6, dyn: -3 } });
+  // in: entrada do canal (palavras 0 e 1, aqui zeradas), usada pelos alertas.
+  assert.deepEqual(out[0], { kind: "ch", index: 1, meter: { l: -10, r: -11, gate: -6, dyn: -3, in: 0 } });
   assert.deepEqual(out[40], { kind: "aux", index: 1, meter: { l: 0, r: 0 } });
 });

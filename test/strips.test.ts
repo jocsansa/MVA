@@ -65,6 +65,8 @@ test("parse da coleção única: 8 valores por strip e 4 no DCA (saída nas posi
   const before = (40 + 8 + 16 + 4 + 8) * 8; // palavras antes do primeiro DCA
   const pkt = Buffer.alloc(4 + (before + 16 * 4) * 2);
   pkt.writeUInt32BE(METER_REPORT_ID, 0);
+  pkt.writeInt16BE(-3 * 256, 4 + 0 * 2); // ch 1 entrada L
+  pkt.writeInt16BE(-8 * 256, 4 + 1 * 2); // ch 1 entrada R
   pkt.writeInt16BE(-12 * 256, 4 + 2 * 2); // ch 1 saída L
   pkt.writeInt16BE(-6 * 256, 4 + ((40 + 8) * 8 + 3) * 2); // bus 1 saída R
   pkt.writeInt16BE(-10 * 256, 4 + (before + 2) * 2); // dca 1 pós-fader L
@@ -73,6 +75,7 @@ test("parse da coleção única: 8 valores por strip e 4 no DCA (saída nas posi
   assert.equal(r.length, 92);
   assert.equal(r[0]!.kind, "ch");
   assert.equal(r[0]!.meter!.l, -12);
+  assert.equal(r[0]!.meter!.in, -3, "entrada do canal: maior de L/R, antes do fader e do mute");
   const bus1 = r.find((m) => m.kind === "bus" && m.index === 1)!;
   assert.equal(bus1.meter!.r, -6);
   const dca1 = r.find((m) => m.kind === "dca" && m.index === 1)!;
