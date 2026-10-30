@@ -14,8 +14,17 @@ lida de volta (sem etapa de confirmação por enquanto; veja "Confirmação remo
 git clone https://github.com/jocsansa/MVA.git
 cd MVA
 npm install
-npm run check               # checagem de tipos + testes
+npm run check               # tipos + lint + regras de lint + testes
 ```
+
+No Windows (PowerShell) use `npm.cmd` no lugar de `npm`. Com o servidor rodando,
+`npm run smoke` abre a página num Chrome headless (desktop e celular) e confere que ela carrega,
+conecta e troca de aba sem erro; só olha, não clica em controles da mesa.
+
+Documentação do projeto: [PRODUCT.md](PRODUCT.md) (escopo), [AGENTS.md](AGENTS.md) (regras e
+comandos para agentes), [docs/architecture.md](docs/architecture.md),
+[docs/design.md](docs/design.md), [docs/quality.md](docs/quality.md) e
+[docs/setup.md](docs/setup.md). Este README é o guia de instalação e uso.
 
 ## Usar sem a mesa (mesa simulada)
 
