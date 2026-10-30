@@ -1,11 +1,15 @@
-// Interface (public/index.html): funções puras do bloco <script id="mixer-lib"> e estrutura da página.
-// O bloco é JavaScript puro sem DOM, então roda aqui igual roda no navegador.
+// Interface (public/index.html, app.css e app.js): funções puras do bloco <script id="mixer-lib">
+// e estrutura da página. O bloco é JavaScript puro sem DOM, então roda aqui igual roda no navegador.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { STATIC_FILES } from "../src/static-files.ts";
 
-const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
+const pub = (f: string) => readFile(new URL(`../public/${f}`, import.meta.url), "utf8");
+const html = await pub("index.html");
+// A página inteira (marcação, estilos e script) para as checagens de estrutura.
+const page = [html, await pub("app.css"), await pub("app.js")].join("\n");
 const libSrc = /<script id="mixer-lib">([\s\S]*?)<\/script>/.exec(html)?.[1];
 assert.ok(libSrc, "bloco mixer-lib não encontrado");
 const lib = new Function(`${libSrc}; return MixerLib;`)();
@@ -25,7 +29,7 @@ test("medidor: -60..0 dBFS em 0..100%, zonas verde, âmbar e vermelha", () => {
   // O degradê do CSS muda de cor exatamente nas zonas (70% = -18 dB, 90% = -6 dB).
   assert.equal(lib.meterPct(lib.ZONES.amber), 70);
   assert.equal(lib.meterPct(lib.ZONES.red), 90);
-  assert.match(html, /var\(--m-green\) 0 70%, var\(--m-amber\) 70% 90%, var\(--m-red\) 90%/);
+  assert.match(page, /var\(--m-green\) 0 70%, var\(--m-amber\) 70% 90%, var\(--m-red\) 90%/);
 });
 
 test("pico retido: segura, depois cai, e um pico maior substitui", () => {
@@ -105,21 +109,34 @@ test("valores digitados: dB e pan", () => {
 });
 
 test("página: as abas, Rápido/Completo e ids usados pelo script existem", () => {
-  const tabs = [...html.matchAll(/<button type="button" role="tab" data-tab="(\w+)">([^<]+)<\/button>/g)].map((m) => [m[1], m[2]]);
+  const tabs = [...page.matchAll(/<button type="button" role="tab" data-tab="(\w+)">([^<]+)<\/button>/g)].map((m) => [m[1], m[2]]);
   assert.deepEqual(tabs, [
     ["faders", "FADERS"], ["gain", "GAIN"], ["eq", "EQ"], ["dyn", "GATE/COMP"], ["sends", "SENDS"], ["overview", "OVERVIEW"], ["rec", "SESSÕES"],
   ]);
-  assert.match(html, /id="ui-quick"/);
-  assert.match(html, /id="ui-full"/);
-  const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]));
-  const used = new Set([...html.matchAll(/getElementById\("([^"]+)"\)/g)].map((m) => m[1]));
+  assert.match(page, /id="ui-quick"/);
+  assert.match(page, /id="ui-full"/);
+  const ids = new Set([...page.matchAll(/id="([^"]+)"/g)].map((m) => m[1]));
+  const used = new Set([...page.matchAll(/getElementById\("([^"]+)"\)/g)].map((m) => m[1]));
   for (const id of used) assert.ok(ids.has(id), `elemento #${id} não existe`);
+});
+
+test("página: carrega app.css e app.js (depois do mixer-lib) e o servidor entrega os dois", async () => {
+  assert.match(html, /<link rel="stylesheet" href="\/app\.css">/);
+  assert.ok(html.indexOf('<script id="mixer-lib">') < html.indexOf('<script src="/app.js"></script>'));
+  assert.doesNotMatch(html, /<style>/);
+  // Os caminhos do mapa do servidor abrem o arquivo certo de public/, com o tipo certo.
+  for (const [route, type, name] of [["/app.css", "text/css", "app.css"], ["/app.js", "text/javascript", "app.js"], ["/eq-curve.js", "text/javascript", "eq-curve.js"]]) {
+    const file = STATIC_FILES.get(route!);
+    assert.ok(file, `servidor não entrega ${route}`);
+    assert.equal(file.type, type, `servidor não entrega ${route} como ${type}`);
+    assert.equal(await readFile(file.path, "utf8"), await pub(name!), `${route} não aponta para public/${name}`);
+  }
 });
 
 test("página: só usa rotas que o servidor já tem", async () => {
   const server = await readFile(new URL("../src/server.ts", import.meta.url), "utf8");
   // Começo literal de cada URL pedida pela página (fetch, postJson, EventSource, import).
-  const urls = [...html.matchAll(/(?:fetch|postJson|EventSource|import)\(\s*[`"]([^`"$?]+)/g)].map((m) => m[1]!);
+  const urls = [...page.matchAll(/(?:fetch|postJson|EventSource|import)\(\s*[`"]([^`"$?]+)/g)].map((m) => m[1]!);
   assert.ok(urls.length >= 8);
   const known = ["/api/risk", "/api/param", "/api/sends", "/api/state", "/api/events", "/api/channels/", "/api/sessions", "/api/sessions/", "/api/alerts", "/api/alerts/dismiss", "/eq-curve.js"];
   for (const u of urls) {
@@ -128,21 +145,21 @@ test("página: só usa rotas que o servidor já tem", async () => {
   // Rotas com número entram no servidor como regex (/^\/api\/channels\/...).
   for (const k of known) {
     const base = k.replace(/\/$/, "");
-    assert.ok(server.includes(base) || server.includes(base.replaceAll("/", "\\/")), `servidor não tem ${k}`);
+    assert.ok(STATIC_FILES.has(k) || server.includes(base) || server.includes(base.replaceAll("/", "\\/")), `servidor não tem ${k}`);
   }
 });
 
 test("página: modo Rápido esconde só parâmetros secundários (tudo continua no Completo)", () => {
-  assert.match(html, /body\.quick \.full-only/);
+  assert.match(page, /body\.quick \.full-only/);
   // LPF, Q, tipo de banda, inclinação, modelo da dinâmica, pan, cor e pré/pós ficam no Completo.
-  assert.match(html, /class="eq-card full-only" id="eq-lpf"/);
-  assert.match(html, /rows\[2\]\.el\.classList\.add\("full-only"\)/);
-  assert.match(html, /shapeSeg\.el\.classList\.add\("full-only"\)/);
-  assert.match(html, /slope\.el\.classList\.add\("full-only"\)/);
-  assert.match(html, /m\.el\.classList\.add\("full-only"\)/);
-  assert.match(html, /class="knob full-only"><span class="k-l">PAN/);
-  assert.match(html, /class="s-col full-only"/);
-  assert.match(html, /class="tbtn sc-mode full-only"/);
+  assert.match(page, /class="eq-card full-only" id="eq-lpf"/);
+  assert.match(page, /rows\[2\]\.el\.classList\.add\("full-only"\)/);
+  assert.match(page, /shapeSeg\.el\.classList\.add\("full-only"\)/);
+  assert.match(page, /slope\.el\.classList\.add\("full-only"\)/);
+  assert.match(page, /m\.el\.classList\.add\("full-only"\)/);
+  assert.match(page, /class="knob full-only"><span class="k-l">PAN/);
+  assert.match(page, /class="s-col full-only"/);
+  assert.match(page, /class="tbtn sc-mode full-only"/);
 });
 
 test("sessão gravada: registro legível a partir do JSONL", () => {

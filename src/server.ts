@@ -23,6 +23,7 @@ import { STRIP_KINDS } from "./strips.ts";
 import { buildSendRows, destKey, parseDest, sendPaths, writeSend } from "./sends.ts";
 import { MOMENTS, SessionError, SessionRecorder } from "./recorder.ts";
 import { ALERT_LIMITS, AlertEngine, MeterWindow, alertContext, type Alert } from "./alerts.ts";
+import { STATIC_FILES } from "./static-files.ts";
 
 const host = process.env.CONSOLE_HOST;
 if (!host) {
@@ -105,13 +106,20 @@ wing.on("osc", (path, value) => {
   broadcast("param", { path, value });
 });
 
+/** Corpo do pedido inválido: erro do cliente (400), com mensagem para a página. */
+class BodyError extends Error {}
+
 async function readJson(req: http.IncomingMessage): Promise<unknown> {
   let body = "";
   for await (const chunk of req) {
     body += chunk;
-    if (body.length > 4096) throw new Error("corpo grande demais");
+    if (body.length > 4096) throw new BodyError("corpo grande demais");
   }
-  return JSON.parse(body);
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new BodyError("JSON inválido");
+  }
 }
 
 function sendJson(res: http.ServerResponse, code: number, data: unknown): void {
@@ -133,7 +141,6 @@ const DYN_READ_ROUTE = /^\/api\/channels\/(\d+)\/dyn$/;
 
 /** Mesa sem resposta: 502. Pedido inválido ou recusado pela descrição: 400. */
 const writeErrorCode = (msg: string) => (msg.startsWith("Sem resposta") ? 502 : 400);
-const curvePath = fileURLToPath(new URL("../public/eq-curve.js", import.meta.url));
 
 /** Exige JSON e origem local: impede que outro site no navegador dispare pedidos POST. */
 function isLocalJson(req: http.IncomingMessage): boolean {
@@ -254,17 +261,25 @@ wing.on("meters", () => {
   }, 66);
 });
 
-const server = http.createServer(async (req, res) => {
+// Erro inesperado num pedido vira 500; sem o catch a rejeição derrubaria o servidor no meio do culto.
+// O detalhe (caminhos de arquivo, pilha) fica só no log; a página recebe uma mensagem genérica.
+const server = http.createServer((req, res) => {
+  handleRequest(req, res).catch((e: unknown) => {
+    const bodyError = e instanceof BodyError;
+    if (!bodyError) console.error("Erro no pedido", req.method, req.url, e);
+    if (res.headersSent) res.end();
+    else sendJson(res, bodyError ? 400 : 500, { error: bodyError ? e.message : "Erro interno no servidor" });
+  });
+});
+
+async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse) {
   const url = new URL(req.url ?? "/", "http://localhost");
   if (req.method === "POST") {
-    try {
-      const ses = SESSION_ROUTE.exec(url.pathname);
-      if (ses) await handleSession(req, res, ses[1]!);
-      else if (url.pathname === "/api/alerts/dismiss") await handleDismiss(req, res);
-      else await handleWrite(req, res, url);
-    } catch (e) {
-      sendJson(res, 500, { error: (e as Error).message });
-    }
+    // Erros que os handlers não tratam caem no catch do createServer.
+    const ses = SESSION_ROUTE.exec(url.pathname);
+    if (ses) await handleSession(req, res, ses[1]!);
+    else if (url.pathname === "/api/alerts/dismiss") await handleDismiss(req, res);
+    else await handleWrite(req, res, url);
     return;
   }
   if (req.method !== "GET") {
@@ -272,8 +287,9 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (url.pathname === "/") {
+    const body = await readFile(indexPath); // antes do writeHead: arquivo faltando vira 500
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    res.end(await readFile(indexPath));
+    res.end(body);
   } else if (url.pathname === "/api/describe") {
     // Só leitura: descrição do nó (",s #") com os valores atuais e avisos de risco.
     const path = url.searchParams.get("path") ?? "/";
@@ -315,9 +331,11 @@ const server = http.createServer(async (req, res) => {
     } catch (e) {
       sendJson(res, 502, { error: (e as Error).message });
     }
-  } else if (url.pathname === "/eq-curve.js") {
-    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
-    res.end(await readFile(curvePath));
+  } else if (STATIC_FILES.has(url.pathname)) {
+    const file = STATIC_FILES.get(url.pathname)!;
+    const body = await readFile(file.path);
+    res.writeHead(200, { "content-type": `${file.type}; charset=utf-8` });
+    res.end(body);
   } else if (DYN_READ_ROUTE.test(url.pathname)) {
     // Só leitura: gate e compressor do canal, com tudo o que a descrição da mesa traz.
     try {
@@ -369,7 +387,7 @@ const server = http.createServer(async (req, res) => {
   } else {
     res.writeHead(404).end("não encontrado");
   }
-});
+}
 
 // Só escuta em localhost: a interface não fica exposta na rede.
 server.listen(port, "127.0.0.1", () => {
