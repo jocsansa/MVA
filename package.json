@@ -13,10 +13,17 @@
     "simulate": "node src/simulator.ts",
     "test": "node --test --test-timeout=20000 \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test"
+    "lint": "eslint .",
+    "verify:rules": "node scripts/verify-quality-rules.mjs",
+    "smoke": "node scripts/ui-smoke.mjs",
+    "check": "npm run typecheck && npm run lint && npm run verify:rules && npm test"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^24.0.0",
-    "typescript": "^5.9.0"
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.72.1"
   }
 }
