@@ -19,7 +19,7 @@ Não há build nem CI. No Windows use `npm.cmd`.
   `test()` do `node:test` é isento porque o runner aguarda a promessa.
 - `quality/max-lines` (350 linhas, do toolkit) em **warn**. Contagem na adoção (29/10/2026):
   5 arquivos — `public/app.js` 2307, `src/wing.ts` 581, `src/recorder.ts` 480,
-  `src/simulator.ts` 465, `src/server.ts` 415 (contagem do lint). Plano: dividir por responsabilidade quando o arquivo
+  `src/simulator.ts` 465, `src/server.ts` 415 (contagem do lint; 424 depois do modo rede, 01/11/2026). Plano: dividir por responsabilidade quando o arquivo
   for mexido por outro motivo (o `app.js` primeiro, por aba). Quando zerar, passa para error.
 - `typescript-eslint` recommended + `@eslint/js` recommended. Não baixar severidade nem usar ignores
   amplos para esconder aviso; `eslint-rules/` é cópia do toolkit e não se edita aqui.

@@ -23,8 +23,8 @@ conecta e troca de aba sem erro; só olha, não clica em controles da mesa.
 
 Documentação do projeto: [PRODUCT.md](PRODUCT.md) (escopo), [AGENTS.md](AGENTS.md) (regras e
 comandos para agentes), [docs/architecture.md](docs/architecture.md),
-[docs/design.md](docs/design.md), [docs/quality.md](docs/quality.md) e
-[docs/setup.md](docs/setup.md). Este README é o guia de instalação e uso.
+[docs/design.md](docs/design.md), [docs/quality.md](docs/quality.md),
+[docs/setup.md](docs/setup.md) e [docs/mac.md](docs/mac.md) (Mac da igreja). Este README é o guia de instalação e uso.
 
 ## Usar sem a mesa (mesa simulada)
 
@@ -59,6 +59,30 @@ CONSOLE_HOST=<ip-da-wing> WING_ALLOW_WRITES=1 npm start  # libera comandos
 ```
 
 No Windows use `$env:CONSOLE_HOST="<ip>"; npm start`. A porta da página muda com `PORT`.
+
+No **Mac da igreja** use `scripts/mac/mva.sh` (instalar, achar a mesa, rodar em segundo plano sem o
+Mac dormir): veja [docs/mac.md](docs/mac.md).
+
+### Acesso pelo celular (modo rede)
+
+Por padrão o servidor só escuta em `127.0.0.1` (só o próprio computador). Para abrir no celular,
+na mesma rede:
+
+```
+CONSOLE_HOST=<ip-da-wing> LISTEN_HOST=0.0.0.0 ACCESS_PIN=<senha> npm start
+```
+
+- `ACCESS_PIN` é obrigatório no modo rede (mínimo 6 caracteres); sem ele o servidor não sobe.
+- O servidor mostra os endereços (`http://<ip>:3000`, `http://<nome>.local:3000`). No celular,
+  a página pede a senha uma vez e o navegador guarda um cookie por 90 dias (`HttpOnly`,
+  `SameSite=Strict`, sem a senha dentro). Trocar a senha derruba os acessos antigos.
+- 5 senhas erradas do mesmo IP bloqueiam esse IP por 10 minutos.
+- Pedidos do próprio computador (curl, Claude Code) não pedem senha.
+- O cabeçalho `Host` precisa ser um nome ou IP desta máquina (contra DNS rebinding) e os POST
+  continuam exigindo JSON e a origem da própria página.
+- É HTTP sem criptografia: na mesma rede, alguém com ferramenta de captura pode ver a senha.
+  Prefira a rede da equipe técnica (não a dos visitantes) e mantenha somente leitura quando não
+  precisar comandar a mesa pelo celular.
 
 ## Protocolo (fonte: WING Remote Protocols, P.-G. Maillot)
 
@@ -296,6 +320,7 @@ curl -s -H "content-type: application/json" -d '{"param":"thr","value":-20}' htt
 ```
 
 A rota recusa pedidos com `Origin` de outro site e sem `content-type: application/json`.
+No modo rede, rode o curl no próprio computador do servidor (`localhost`): de fora pede a senha.
 
 ### Ganho: cuidados
 

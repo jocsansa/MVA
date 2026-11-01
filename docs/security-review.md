@@ -16,8 +16,12 @@ docs/setup.md. O texto do prompt fica em inglês, como no original.
 
 ## Pontos de entrada do MVA (para o modelo de ameaça)
 
-- Rotas HTTP em `src/server.ts` (escuta só em 127.0.0.1): GETs de leitura, POSTs de escrita na mesa
-  (só com `WING_ALLOW_WRITES=1`), sessões e alertas. POST exige JSON e origem local (`isLocalJson`).
+- Rotas HTTP em `src/server.ts` (padrão: só 127.0.0.1): GETs de leitura, POSTs de escrita na mesa
+  (só com `WING_ALLOW_WRITES=1`), sessões e alertas. POST exige JSON e origem da própria página
+  (`isLocalJson`).
+- Modo rede (`LISTEN_HOST` fora do loopback): `src/access.ts` — conferência do `Host`, senha
+  `ACCESS_PIN` em `POST /acesso`, cookie derivado da senha, bloqueio após 5 erros, isenção para
+  pedidos do próprio computador. HTTP sem TLS na rede local.
 - Caminhos de parâmetro validados por `isSafePath` e pela descrição do nó; ids de sessão por
   `isSessionId` (arquivos em `data/sessions`).
 - Página (`public/`): conteúdo vindo da mesa (nomes de canal) entra no DOM.

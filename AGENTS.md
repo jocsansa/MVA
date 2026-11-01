@@ -3,7 +3,7 @@
 Controle da Behringer WING pela rede, com interface no navegador, para a equipe de som da igreja.
 Produto e escopo: [PRODUCT.md](PRODUCT.md). Uso, protocolo e rotas: [README.md](README.md).
 Detalhes: [arquitetura](docs/architecture.md), [design](docs/design.md), [qualidade](docs/quality.md),
-[setup do toolkit](docs/setup.md).
+[setup do toolkit](docs/setup.md), [Mac da igreja](docs/mac.md).
 
 ## Regras de segurança (não negociáveis)
 
@@ -30,6 +30,8 @@ No Windows use `npm.cmd` (o PowerShell bloqueia `npm.ps1`). Node ≥ 22.18, Type
 - Página no navegador: `npm run smoke` (Chrome headless, servidor rodando; só olha, não clica em
   controles da mesa)
 - Achar a mesa real: `npm run discover`
+- Celular na rede: `LISTEN_HOST=0.0.0.0 ACCESS_PIN=<senha>` (veja README, "Acesso pelo celular")
+- Mac da igreja: `scripts/mac/mva.sh instalar|achar|fundo|status|parar|atualizar` (docs/mac.md)
 
 ## Combinados de trabalho
 

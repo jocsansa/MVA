@@ -11,7 +11,8 @@
 
 | Arquivo | Papel |
 |---|---|
-| `src/server.ts` | Servidor HTTP local (127.0.0.1): rotas `/api/*`, SSE em `/api/events`, arquivos da página, liga gravador e alertas. Erro inesperado vira 500 genérico (detalhe só no log); corpo inválido vira 400 |
+| `src/server.ts` | Servidor HTTP (127.0.0.1; modo rede com `LISTEN_HOST` + `ACCESS_PIN`): rotas `/api/*`, SSE em `/api/events`, arquivos da página, liga gravador e alertas. Erro inesperado vira 500 genérico (detalhe só no log); corpo inválido vira 400 |
+| `src/access.ts` | Antes de toda rota: confere o `Host`; no modo rede, senha (`ACCESS_PIN`) com cookie e bloqueio por tentativas; origem dos POST. Não fala com a mesa |
 | `src/static-files.ts` | Rotas dos arquivos da página (`/app.css`, `/app.js`, `/eq-curve.js`) → arquivo em `public/` e tipo; separado para o teste conferir sem subir o servidor |
 | `src/wing.ts` | Cliente da WING: OSC (UDP 2223), assinatura `/*s`, heartbeat, medidores; escrita só por `write()` privado e só com `allowWrites` |
 | `src/osc.ts` | Codificação/decodificação OSC 1.0 |
@@ -29,6 +30,7 @@
 | `public/eq-curve.js` | Curva de resposta do EQ (módulo ES, também importado pelos testes) |
 | `test/fake-wing.ts` | Mesa falsa dos testes: registra escritas e responde GETs |
 | `scripts/ui-smoke.mjs` | Smoke da página num Chrome headless |
+| `scripts/mac/mva.sh` | Mac da igreja: instalar, achar a mesa, servidor em segundo plano com `caffeinate` (docs/mac.md) |
 | `eslint-rules/`, `scripts/verify-quality-rules.mjs` | Regras de lint do toolkit (cópia) e autoteste |
 
 ## Fronteiras e fluxo
@@ -42,9 +44,13 @@ WING ──OSC UDP 2223──▶ wing.ts ──estado/eventos──▶ server.ts
 
 - **Escrita**: só passa por `WingClient` com `WING_ALLOW_WRITES=1`. Antes de escrever, o valor é
   conferido contra a descrição atual do nó; depois, lido de volta. `dryRun` devolve o comando exato.
-- **POST** exige `content-type: application/json` e origem local (`isLocalJson`).
+- **POST** exige `content-type: application/json` e a origem da própria página (`isLocalJson` →
+  `access.sameOrigin`).
+- **Acesso** (`src/access.ts`): `Host` precisa ser um nome desta máquina; no modo rede, quem não é
+  o próprio computador precisa da senha (cookie de 90 dias).
 - **Gravação e alertas** recebem eventos e medidores; não têm acesso ao caminho de escrita.
-- O servidor escuta só em `127.0.0.1`. Erro inesperado num pedido vira 500 sem derrubar o processo.
+- Por padrão o servidor escuta só em `127.0.0.1`; `LISTEN_HOST=0.0.0.0` abre para a rede e exige
+  `ACCESS_PIN`. Erro inesperado num pedido vira 500 sem derrubar o processo.
 
 ## Dados
 

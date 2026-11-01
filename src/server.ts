@@ -1,5 +1,6 @@
 // Servidor local: lê a WING e mostra o estado no navegador (http://localhost:PORT).
 // Por padrão é SOMENTE LEITURA. Escritas só com WING_ALLOW_WRITES=1.
+// Por padrão só escuta em 127.0.0.1; modo rede (celular) com LISTEN_HOST=0.0.0.0 + ACCESS_PIN (src/access.ts).
 
 import http from "node:http";
 import { readFile } from "node:fs/promises";
@@ -24,6 +25,7 @@ import { buildSendRows, destKey, parseDest, sendPaths, writeSend } from "./sends
 import { MOMENTS, SessionError, SessionRecorder } from "./recorder.ts";
 import { ALERT_LIMITS, AlertEngine, MeterWindow, alertContext, type Alert } from "./alerts.ts";
 import { STATIC_FILES } from "./static-files.ts";
+import { Access, checkAccessConfig, lanUrls } from "./access.ts";
 
 const host = process.env.CONSOLE_HOST;
 if (!host) {
@@ -32,6 +34,13 @@ if (!host) {
   process.exit(1);
 }
 const port = Number(process.env.PORT ?? 3000);
+const listenHost = process.env.LISTEN_HOST ?? "127.0.0.1";
+const accessError = checkAccessConfig(listenHost, process.env.ACCESS_PIN);
+if (accessError) {
+  console.error(accessError);
+  process.exit(1);
+}
+const access = new Access({ listenHost, port, pin: process.env.ACCESS_PIN });
 const indexPath = fileURLToPath(new URL("../public/index.html", import.meta.url));
 
 const allowWrites = process.env.WING_ALLOW_WRITES === "1";
@@ -142,11 +151,9 @@ const DYN_READ_ROUTE = /^\/api\/channels\/(\d+)\/dyn$/;
 /** Mesa sem resposta: 502. Pedido inválido ou recusado pela descrição: 400. */
 const writeErrorCode = (msg: string) => (msg.startsWith("Sem resposta") ? 502 : 400);
 
-/** Exige JSON e origem local: impede que outro site no navegador dispare pedidos POST. */
+/** Exige JSON e origem desta página (localhost, ou o IP/nome da máquina no modo rede): outro site não dispara POST. */
 function isLocalJson(req: http.IncomingMessage): boolean {
-  const origin = req.headers.origin;
-  return !!req.headers["content-type"]?.startsWith("application/json") &&
-    (!origin || origin === `http://localhost:${port}` || origin === `http://127.0.0.1:${port}`);
+  return !!req.headers["content-type"]?.startsWith("application/json") && access.sameOrigin(req.headers.origin);
 }
 
 const SESSION_ROUTE = /^\/api\/sessions\/([\w-]+)$/;
@@ -274,6 +281,7 @@ const server = http.createServer((req, res) => {
 
 async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse) {
   const url = new URL(req.url ?? "/", "http://localhost");
+  if (await access.guard(req, res, url)) return; // Host, e senha no modo rede
   if (req.method === "POST") {
     // Erros que os handlers não tratam caem no catch do createServer.
     const ses = SESSION_ROUTE.exec(url.pathname);
@@ -389,10 +397,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   }
 }
 
-// Só escuta em localhost: a interface não fica exposta na rede.
-server.listen(port, "127.0.0.1", () => {
+// Padrão: só localhost. Modo rede: celulares na mesma rede, com a senha ACCESS_PIN.
+server.listen(port, listenHost, () => {
   const mode = allowWrites ? "ESCRITA LIBERADA" : "somente leitura";
   console.log(`WING ${host} — interface em http://localhost:${port} (${mode})`);
+  if (access.lanMode) console.log(`Modo rede (senha ACCESS_PIN). No celular, mesma rede: ${lanUrls(port).join("  ")}`);
 });
 
 setInterval(() => {
