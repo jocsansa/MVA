@@ -16,6 +16,7 @@
     "lint": "eslint .",
     "verify:rules": "node scripts/verify-quality-rules.mjs",
     "smoke": "node scripts/ui-smoke.mjs",
+    "medidor": "node scripts/medidor-entrada.mjs",
     "check": "npm run typecheck && npm run lint && npm run verify:rules && npm test"
   },
   "devDependencies": {

@@ -138,7 +138,7 @@ test("página: só usa rotas que o servidor já tem", async () => {
   // Começo literal de cada URL pedida pela página (fetch, postJson, EventSource, import).
   const urls = [...page.matchAll(/(?:fetch|postJson|EventSource|import)\(\s*[`"]([^`"$?]+)/g)].map((m) => m[1]!);
   assert.ok(urls.length >= 8);
-  const known = ["/api/risk", "/api/param", "/api/sends", "/api/state", "/api/events", "/api/channels/", "/api/sessions", "/api/sessions/", "/api/alerts", "/api/alerts/dismiss", "/eq-curve.js"];
+  const known = ["/api/risk", "/api/param", "/api/sends", "/api/state", "/api/events", "/api/channels/", "/api/sessions", "/api/sessions/", "/api/alerts", "/api/alerts/dismiss", "/api/assistant/", "/api/access", "/eq-curve.js"];
   for (const u of urls) {
     assert.ok(known.some((k) => u === k || (k.endsWith("/") && u.startsWith(k))), `rota desconhecida: ${u}`);
   }

@@ -2268,6 +2268,158 @@
   }
   alertPill.addEventListener("click", showAlertHistory);
 
+  // ---------- assistente de ganho (desligado / sugestivo / automático) ----------
+  // O servidor decide e escreve (fila, limites, leitura de volta); a página só mostra e manda o OK.
+  const asList = document.getElementById("as-list");
+  const asMode = document.getElementById("as-mode");
+  const asNote = document.getElementById("as-note");
+  const asHistBtn = document.getElementById("as-hist");
+  const asAccess = document.getElementById("as-access");
+  let asState = { mode: "off", writesEnabled: false, suggestions: [], history: [] };
+  const AS_HIST_TITLE = "Assistente: histórico";
+  const AS_STATUS = {
+    pending: "SUGESTÃO", applying: "APLICANDO", applied: "FEITO", failed: "FALHOU", unavailable: "SEM CORREÇÃO",
+    undone: "DESFEITO", dismissed: "IGNORADA", resolved: "RESOLVIDA", expired: "EXPIROU",
+  };
+  const AS_NOTE = {
+    off: "Desligado: só os alertas.",
+    suggest: "Sugestivo: propõe a correção e só aplica com o seu OK.",
+    auto: "Automático: corrige o ganho sozinho (com compensação no trim). Desmutar continua pedindo OK.",
+  };
+  const AS_SHOWN = new Set(["pending", "applying", "applied", "failed", "unavailable", "undone"]);
+  // Re-render só quando o que aparece muda, e sem fechar "Comandos" aberto (o operador pode estar
+  // conferindo o comando antes de tocar em Aplicar).
+  let asLastKey = "";
+  const asOpen = new Set();
+  function asButton(text, cls, onClick, disabled, title) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "big " + cls;
+    b.textContent = text;
+    b.disabled = !!disabled;
+    if (title) b.title = title;
+    b.addEventListener("click", async () => { b.disabled = true; await onClick(); b.disabled = false; });
+    return b;
+  }
+  async function asPost(action, body) {
+    const { data, error } = await postJson("/api/assistant/" + action, body);
+    if (error) toast(error, true);
+    else if (data && data.ok === false) toast("Não aplicou: " + data.error, true);
+    return data;
+  }
+  function renderAssist() {
+    const w = asState.writesEnabled;
+    for (const b of asMode.querySelectorAll("button")) {
+      b.classList.toggle("on", b.dataset.mode === asState.mode);
+      b.setAttribute("aria-pressed", String(b.dataset.mode === asState.mode));
+      if (b.dataset.mode === "auto") b.disabled = !w;
+    }
+    asNote.textContent = AS_NOTE[asState.mode] + (w ? "" : " Somente leitura: aplicar precisa de WING_ALLOW_WRITES=1.");
+    document.getElementById("assist").dataset.mode = asState.mode;
+    const shown = asState.suggestions.filter((s) => AS_SHOWN.has(s.status));
+    const key = JSON.stringify([w, shown.map((s) => [s.id, s.status, s.title, s.detail, s.message, s.commands, s.by])]);
+    if (key !== asLastKey) {
+      asLastKey = key;
+      asList.replaceChildren(...shown.map((s) => {
+        const el = document.createElement("div");
+        el.className = `as-card st-${s.status}`;
+        const tag = document.createElement("span");
+        tag.className = "as-tag";
+        tag.textContent = s.status === "applied" && s.by === "auto" ? "AUTOMÁTICO" : AS_STATUS[s.status] || s.status;
+        const txt = document.createElement("div");
+        const title = document.createElement("div");
+        title.className = "as-t";
+        title.textContent = s.title;
+        const detail = document.createElement("div");
+        detail.className = "as-d";
+        detail.textContent = s.message && s.status !== "pending" ? s.message : s.detail;
+        txt.append(title, detail);
+        const btns = document.createElement("div");
+        btns.className = "as-btns";
+        if (s.status === "pending") {
+          btns.append(
+            asButton("Aplicar", "as-go", () => asPost("apply", { id: s.id }), !w, w ? "Envia os comandos abaixo para a mesa" : "Somente leitura"),
+            asButton("Ignorar", "ghost", () => asPost("dismiss", { id: s.id }), false, "Some e não volta por 10 minutos"),
+          );
+        } else if (s.status === "applied") {
+          btns.append(
+            asButton("Desfazer", "ghost", () => asPost("undo", { id: s.id }), !w, "Volta os valores anteriores (se ninguém mexeu depois)"),
+            asButton("OK", "ghost", () => asPost("dismiss", { id: s.id })),
+          );
+        } else if (s.status !== "applying") {
+          btns.append(asButton("OK", "ghost", () => asPost("dismiss", { id: s.id })));
+        }
+        el.append(tag, txt, btns);
+        if (s.commands && s.commands.length) {
+          const det = document.createElement("details");
+          det.open = asOpen.has(s.id);
+          det.addEventListener("toggle", () => { if (det.open) asOpen.add(s.id); else asOpen.delete(s.id); });
+          const sum = document.createElement("summary");
+          sum.textContent = s.status === "pending" ? "Comandos que vão para a mesa" : "Comandos enviados";
+          const ul = document.createElement("ul");
+          for (const c of s.commands) { const li = document.createElement("li"); const code = document.createElement("code"); code.textContent = c; li.appendChild(code); ul.appendChild(li); }
+          det.append(sum, ul);
+          el.appendChild(det);
+        }
+        return el;
+      }));
+    }
+    if (dlg.root.classList.contains("open") && dlg.title.textContent === AS_HIST_TITLE) showAssistHistory();
+  }
+  for (const b of asMode.querySelectorAll("button")) {
+    b.addEventListener("click", async () => {
+      const mode = b.dataset.mode;
+      if (mode === asState.mode) return;
+      if (mode === "auto" && !window.confirm(
+        "Modo automático: o assistente vai mudar o ganho e o trim dos canais sozinho, sem perguntar.\n\n" +
+        "Limites: uma correção por vez, no máximo 6 por minuto e 18 dB por canal; cada ação pode ser desfeita.\n" +
+        "Desmutar continua pedindo OK. As sugestões de ganho que estão na tela serão aplicadas agora.\n\nLigar o automático?")) return;
+      await asPost("mode", { mode });
+    });
+  }
+  function showAssistHistory() {
+    const box = document.createElement("div");
+    box.className = "al-hist";
+    const note = document.createElement("p");
+    note.textContent = `Modo atual: ${asState.mode === "auto" ? "automático" : asState.mode === "suggest" ? "sugestivo" : "desligado"}. ` +
+      "Tudo o que o assistente sugeriu e fez desde que o servidor subiu (também vai para a gravação da sessão).";
+    box.appendChild(note);
+    const hist = [...asState.history].reverse();
+    if (!hist.length) { const p = document.createElement("p"); p.textContent = "Nada até agora."; box.appendChild(p); }
+    for (const h of hist) {
+      const row = document.createElement("div");
+      const time = document.createElement("time");
+      time.textContent = new Date(h.t).toLocaleTimeString("pt-BR");
+      const act = document.createElement("span");
+      act.className = h.status === "applied" ? "a-cleared" : h.status === "failed" ? "a-raised" : "a-dismissed";
+      act.textContent = (AS_STATUS[h.status] || h.status) + (h.by === "auto" && h.status === "applied" ? " (auto)" : "");
+      const what = document.createElement("span");
+      what.textContent = h.title + (h.message ? ` — ${h.message}` : "");
+      row.append(time, act, what);
+      box.appendChild(row);
+    }
+    openPicker(AS_HIST_TITLE, box);
+  }
+  asHistBtn.addEventListener("click", showAssistHistory);
+  // Acesso pela rede: o código e os links só chegam no computador do servidor.
+  (async () => {
+    try {
+      const a = await (await fetch("/api/access")).json();
+      if (!a.pin) return;
+      asAccess.hidden = false;
+      asAccess.textContent = `Rede · código ${a.pin}`;
+      asAccess.addEventListener("click", () => {
+        const box = document.createElement("div");
+        box.className = "al-hist";
+        const p = document.createElement("p");
+        p.textContent = `No celular ou tablet (mesma rede da mesa), abra um destes endereços. Se pedir, o código é ${a.pin}.`;
+        box.appendChild(p);
+        for (const u of a.urls) { const c = document.createElement("code"); c.className = "as-url"; c.textContent = u; box.appendChild(c); }
+        openPicker("Abrir em outro aparelho", box);
+      });
+    } catch {}
+  })();
+
   // ---------- eventos do servidor ----------
   setMode(uiMode);
   const es = new EventSource("/api/events");
@@ -2286,6 +2438,7 @@
   es.addEventListener("param", (e) => { const p = JSON.parse(e.data); onEqParam(p.path, p.value); onDynParam(p.path, p.value); onSendParam(p.path, p.value); });
   es.addEventListener("status", (e) => { lastStatus = JSON.parse(e.data); renderStatus(lastStatus); });
   es.addEventListener("alerts", (e) => { alertState = JSON.parse(e.data); renderAlerts(); });
+  es.addEventListener("assistant", (e) => { asState = JSON.parse(e.data); renderAssist(); });
   es.addEventListener("session", (e) => {
     recActive = JSON.parse(e.data);
     if (!recMoments.length || !recPanel.hidden) loadSessions();

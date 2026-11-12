@@ -34,6 +34,22 @@
 <div id="ro-note">Somente leitura: para mudar valores pela página, inicie com
   <code>CONSOLE_HOST=&lt;ip&gt; WING_ALLOW_WRITES=1 npm start</code></div>
 <div class="alerts" id="alerts" aria-label="Alertas ao vivo"></div>
+<section class="assist" id="assist" aria-label="Assistente de ganho">
+  <div class="as-bar">
+    <span class="as-label">Assistente</span>
+    <div class="seg as-mode" id="as-mode" role="group" aria-label="Modo do assistente">
+      <button type="button" class="big ghost" data-mode="off" title="Só os alertas; nada é sugerido">Desligado</button>
+      <button type="button" class="big ghost" data-mode="suggest" title="Sugere correções; só aplica com o seu OK">Sugestivo</button>
+      <button type="button" class="big ghost" data-mode="auto" title="Corrige sozinho, com limites; pode desfazer">Automático</button>
+    </div>
+    <span class="as-note" id="as-note" role="status"></span>
+    <div class="as-tools">
+      <button type="button" class="big ghost" id="as-hist" title="Tudo o que o assistente sugeriu e fez">Histórico</button>
+      <button type="button" class="big ghost" id="as-access" hidden title="Abrir a página no celular ou tablet">Rede</button>
+    </div>
+  </div>
+  <div class="as-list" id="as-list" aria-live="polite"></div>
+</section>
 <div class="ctx" id="ctx" hidden>
   <span class="ctx-hint" id="ctx-hint"></span>
   <button type="button" class="big ghost" id="ctx-open" hidden></button>

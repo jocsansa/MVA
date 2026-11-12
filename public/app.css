@@ -413,6 +413,47 @@
     .al details { grid-column:1 / -1; }
   }
 
+  /* Assistente de ganho: barra do modo e cartões de sugestão/ação (azul, para não confundir com alerta). */
+  .assist { --as:#3b82f6; background:var(--s0); border-bottom:1px solid var(--line); }
+  .as-bar { display:flex; align-items:center; gap:8px 12px; flex-wrap:wrap; padding:6px 16px; }
+  .as-label { font-size:11px; font-weight:800; letter-spacing:.12em; color:var(--muted); text-transform:uppercase; }
+  .as-mode { flex:0 1 auto; }
+  .as-mode .big { min-height:42px; padding:0 12px; font-size:14px; }
+  .assist[data-mode="auto"] .as-mode .big.on { background:var(--mute); border-color:var(--mute); color:#fff; }
+  .as-note { flex:1 1 220px; min-width:0; font-size:12px; color:var(--ink2); }
+  .assist[data-mode="auto"] .as-note { color:var(--text); font-weight:700; }
+  .as-tools { display:flex; gap:6px; margin-left:auto; }
+  .as-tools .big { min-height:42px; font-size:13px; padding:0 12px; }
+  .as-list { display:flex; flex-direction:column; gap:6px; padding:0 16px 8px; max-height:38vh; overflow:auto; }
+  .as-list:empty { display:none; }
+  .as-card { display:grid; grid-template-columns:auto minmax(0, 1fr) auto; gap:4px 12px; align-items:center; padding:8px 8px 8px 12px;
+    border:1px solid var(--as); border-left-width:4px; border-radius:8px; background:#0c1526; }
+  .as-tag { padding:4px 8px; border-radius:6px; font-size:11px; font-weight:800; letter-spacing:.1em; background:var(--as); color:#fff; }
+  .as-card.st-applied .as-tag, .as-card.st-undone .as-tag { background:var(--ok); color:#06240f; }
+  .as-card.st-failed, .as-card.st-unavailable { border-color:var(--accent); background:#261a07; }
+  .as-card.st-failed .as-tag, .as-card.st-unavailable .as-tag { background:var(--accent); color:var(--accent-ink); }
+  .as-card.st-applied, .as-card.st-undone { border-color:var(--edge); background:var(--s1); }
+  .as-t { font-size:15px; font-weight:800; overflow-wrap:anywhere; }
+  .as-d { font-size:13px; color:var(--ink2); }
+  .as-btns { display:flex; gap:6px; }
+  .big.as-go { background:var(--as); border-color:var(--as); color:#fff; }
+  .as-card details { grid-column:2 / 4; font-size:13px; color:var(--ink2); }
+  .as-card summary { display:flex; align-items:center; min-height:32px; cursor:pointer; font-weight:700; color:var(--text); }
+  .as-card ul { margin:2px 0 6px; padding-left:20px; }
+  .as-card code, .as-url { font:12px ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap:anywhere; }
+  .as-url { display:block; padding:10px 0; border-top:1px solid var(--line); color:var(--text); }
+  @media (max-width:700px) {
+    .as-bar { padding:6px 12px; }
+    .as-mode { flex:1 1 100%; order:2; }
+    .as-note { order:3; flex-basis:100%; }
+    .as-tools { margin-left:auto; }
+    .as-list { padding:0 12px 8px; max-height:30vh; }
+    .as-card { grid-template-columns:minmax(0, 1fr); }
+    .as-tag { justify-self:start; }
+    .as-btns .big { flex:1; }
+    .as-card details { grid-column:1; }
+  }
+
   @media (max-width:1500px) { .pill.info:not(.has-err) { display:none; } }
   @media (max-width:760px) {
     .top { padding:6px 12px; }

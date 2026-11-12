@@ -60,6 +60,27 @@ CONSOLE_HOST=<ip-da-wing> WING_ALLOW_WRITES=1 npm start  # libera comandos
 
 No Windows use `$env:CONSOLE_HOST="<ip>"; npm start`. A porta da página muda com `PORT`.
 
+No **Mac** (o computador do teste de domingo): instale o Node.js 24 LTS pelo `.pkg` de
+https://nodejs.org e use os mesmos comandos do macOS/Linux. Na primeira vez, o macOS pergunta se o
+`node` pode aceitar conexões de entrada: **Permitir** (sem isso os medidores da WING e os celulares
+não chegam). Roteiro completo do teste no culto: [docs/teste-no-culto.md](docs/teste-no-culto.md).
+
+### Celular, tablet ou outro notebook (acesso pela rede)
+
+```
+CONSOLE_HOST=<ip-da-wing> LAN=1 npm start                 # somente leitura
+CONSOLE_HOST=<ip-da-wing> WING_ALLOW_WRITES=1 LAN=1 npm start
+```
+
+Com `LAN=1` o servidor escuta na rede e mostra no terminal o **código de acesso** e os links
+(`http://<ip-do-computador>:3000/?pin=<código>`). Outro aparelho abre o link (ou digita o código na
+tela de entrada) e fica liberado por um cookie aleatório até o servidor reiniciar. O próprio
+computador do servidor não precisa de código e vê o botão **Rede · código** na página. O código muda
+a cada início; para fixar, use `MVA_PIN=<4 a 12 dígitos>`. Dez tentativas erradas num minuto
+bloqueiam aquele aparelho por um minuto (os outros continuam entrando). Em qualquer
+modo o servidor só aceita pedidos endereçados a um nome deste computador (proteção contra DNS
+rebinding). Sem `LAN=1` continua só em `127.0.0.1`.
+
 ## Protocolo (fonte: WING Remote Protocols, P.-G. Maillot)
 
 | O quê | Como |
@@ -275,6 +296,61 @@ escrevem na mesa**. Desenho das regras do automix, adaptado para a WING.
 No simulador os canais 1 a 20 têm fonte, e a entrada sobe com o ganho: ganho no máximo faz o
 canal clipar. Os canais 21 a 40 não têm fonte. Abrir um deles provoca "canal sem sinal".
 
+### Assistente de ganho (desligado, sugestivo, automático)
+
+Barra **ASSISTENTE** abaixo dos alertas, em todas as abas. O modo vale para todo mundo conectado.
+
+| Modo | O que faz |
+|---|---|
+| **Desligado** | Nada é sugerido (os alertas continuam) |
+| **Sugestivo** (padrão ao subir) | Cartão azul com a correção e os comandos exatos; só aplica com **Aplicar** |
+| **Automático** | Aplica sozinho o que é permitido, com limites; o resto fica pedindo OK. Pede confirmação ao ligar; nunca liga sozinho ao subir o servidor |
+
+**Correções** (limites em `ASSIST_LIMITS`, [src/assistant-rules.ts](src/assistant-rules.ts); **calibração pendente**):
+
+| Regra | Condição | Correção |
+|---|---|---|
+| Clip | Entrada em −0,5 dBFS ou acima | Baixar o ganho até o pico ficar em −12 dBFS (mín. 3, máx. 12 dB) |
+| Quente | Pico acima de −5 dBFS em 3 segundos de uma janela de 20 s | Baixar o ganho até o pico máximo ficar em −12 dBFS |
+| Fraco | Com sinal (> −45 dBFS) em 40 de 60 s, pico máximo abaixo de −32 dBFS | Subir o ganho até −12 dBFS (máx. 10 dB) |
+| Mutado com sinal | Mute, fader acima de −50 dB e entrada acima de −45 dBFS por 2 s | Desmutar, **sempre com OK** (`autoUnmute: false`) |
+
+- **Neutra no volume**: a correção muda o ganho da **fonte** (headamp) e compensa no **trim** de todos
+  os canais que usam a mesma fonte. O nível depois do trim (PA, retornos, envios, gravação) não muda.
+  Se o trim não tiver margem, o passo diminui até caber; se não couber nada (ou a fonte não tiver
+  ganho, como USB), a sugestão vira "sem correção" com a orientação. Canal estéreo (`$mode` ST ou
+  M/S), ou entrada que também alimenta um canal estéreo, também fica sem correção até o teste na
+  mesa real. Se alguma leitura do patch dos 40 canais se perder (UDP), nada é enviado.
+- **Ordem segura**: primeiro a escrita que abaixa o nível, depois a que sobe (baixar: ganho e depois
+  trim; subir: trim e depois ganho). Cada escrita é validada na descrição da mesa e lida de volta;
+  se uma falhar, as anteriores são desfeitas. O ganho passa pela trava do espelho `$g` (veja
+  "Ganho: cuidados").
+- **Limites do automático**: uma correção por vez (fila), 10 s entre correções no mesmo canal,
+  no máximo 6 ações por minuto e 18 dB somados por canal; canal que teve ganho baixado não ganha
+  aumento automático. Passou de um limite, a sugestão fica pedindo OK. Correção que falhou só volta
+  depois de 2 minutos; depois de o ganho mudar na mesa, o canal espera 10 s antes de nova sugestão.
+  "Subir" pendente sai se o sinal crescer (o aumento passaria do alvo) ou se o canal passar a clipar.
+- **Desfazer** (por 3 minutos): volta os valores anteriores, na ordem segura, só se a mesa ainda
+  estiver como o assistente deixou. **Ignorar**: some e não volta por 10 minutos.
+- O ganho mudado na mesa (por qualquer um) resolve a sugestão pendente daquele canal.
+- Tudo entra no registro da sessão (`type: "assist"`: `proposed`, `applied` com os comandos e os
+  valores, `failed`, `unavailable`, `dismissed`, `undone`, `mode`) e no terminal.
+- **Medidor de entrada antes ou depois do trim**: o app supõe antes (no conversor). Se o teste na
+  mesa mostrar que é depois, inicie com `INPUT_METER_POST_TRIM=1` (o assistente desconta o trim).
+  `npm run medidor -- <canal>` mostra entrada, ganho e trim de um canal (só leitura).
+- `ASSIST_MODE=off` sobe com o assistente desligado.
+
+| Rota | O que faz |
+|---|---|
+| `GET /api/assistant` | Modo, sugestões e ações recentes, histórico e limites |
+| `POST /api/assistant/mode` `{mode}` | `off`, `suggest` ou `auto` (auto só com `WING_ALLOW_WRITES=1`) |
+| `POST /api/assistant/apply` `{id}` | OK numa sugestão pendente: escreve na mesa e devolve `commands` e `writes` |
+| `POST /api/assistant/dismiss` `{id}` | Ignora a sugestão (ou tira da tela uma ação já feita) |
+| `POST /api/assistant/undo` `{id}` | Desfaz uma ação aplicada |
+| `GET /api/access` | No próprio computador: se a rede está ligada, código e links. Nos outros: só `lan` |
+
+No simulador, o CH 3 clipa, o CH 4 fica quente e o CH 6 entra fraco, para ver as três regras.
+
 ### Comandar pelo chat (Claude Code)
 
 As rotas acima são HTTP local, então o Claude Code pode operar a mesa a pedido no chat
@@ -296,6 +372,8 @@ curl -s -H "content-type: application/json" -d '{"param":"thr","value":-20}' htt
 ```
 
 A rota recusa pedidos com `Origin` de outro site e sem `content-type: application/json`.
+O assistente também pode ser usado pelo chat (`/api/assistant/*`); aplicar e desfazer são escritas
+na mesa e seguem a mesma regra: perguntar antes, um por vez.
 
 ### Ganho: cuidados
 
@@ -311,6 +389,11 @@ Mudar o ganho de uma fonte muda todos os canais que usam essa fonte.
 Renomear, mutar/desmutar, fader, pan, cor e solo, sempre um comando por vez, com
 confirmação, num canal sem entrada, e revertidos depois. Ganho ainda não foi testado na
 mesa real.
+
+**Pendente (teste de 15/11/2026, [roteiro](docs/teste-no-culto.md)):** escrita de ganho e de trim,
+passo do ganho dos pré locais, medidor de entrada antes ou depois do trim, ganho de canal estéreo
+(se a escrita na primeira entrada vale para o par), assistente aplicando e
+desfazendo, acesso pela rede no Mac e convivência com o Mixing Station e o app dos retornos.
 
 Comportamentos do firmware 3.1 descobertos nos testes:
 

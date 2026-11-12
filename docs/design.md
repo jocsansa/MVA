@@ -22,6 +22,11 @@ Tokens em `:root` no início de `public/app.css`:
 Alertas: cartões vermelhos (crítico) e âmbar (aviso) acima do conteúdo, pílula de alertas no topo e
 marca "!" no strip.
 
+Assistente: barra logo abaixo dos alertas (Desligado / Sugestivo / Automático; o Automático ligado
+fica vermelho) e cartões **azuis** (`--as` em `.assist`), para sugestão não parecer alerta. Ação
+feita: cartão neutro com Desfazer; falha ou "sem correção": âmbar. No celular a lista fica limitada a
+30% da altura, com rolagem.
+
 ## Interação
 
 - Abas por função (FADERS, GAIN, EQ, GATE/COMP, SENDS, OVERVIEW, SESSÕES) e modo Rápido/Completo

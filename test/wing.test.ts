@@ -19,7 +19,7 @@ test("parse da resposta de descoberta", () => {
   assert.equal(parseDiscoveryReply("X32,1.2.3.4"), null);
 });
 
-test("applyStripValue atualiza nome, mute, fader, ganho, pan, cor e solo do canal", () => {
+test("applyStripValue atualiza nome, mute, fader, ganho, trim, pan, cor e solo do canal", () => {
   const strips = createStrips();
   applyStripValue(strips, "/ch/1/name", { kind: "string", text: "Kick" });
   applyStripValue(strips, "/ch/1/mute", { kind: "int", text: "1", raw: 1, value: 1 });
@@ -28,9 +28,10 @@ test("applyStripValue atualiza nome, mute, fader, ganho, pan, cor e solo do cana
   applyStripValue(strips, "/ch/1/pan", { kind: "float", text: "-30", raw: 0.35, value: -30 });
   applyStripValue(strips, "/ch/1/col", { kind: "int", text: "9", raw: 0.5, value: 9 });
   applyStripValue(strips, "/ch/1/$solo", { kind: "int", text: "0", raw: 0, value: 0 });
+  applyStripValue(strips, "/ch/1/in/set/trim", { kind: "float", text: "+5.3", raw: 0.6, value: 5.3 });
   assert.equal(applyStripValue(strips, "/ch/1/$fdr", { kind: "float", text: "0", raw: 0, value: 0 }), null);
   assert.deepEqual(strips.ch[0], {
-    kind: "ch", index: 1, name: "Kick", col: 9, mute: true, faderDb: -2, pan: -30, solo: false, gainDb: 20, meter: null,
+    kind: "ch", index: 1, name: "Kick", col: 9, mute: true, faderDb: -2, pan: -30, solo: false, gainDb: 20, trimDb: 5.3, meter: null,
   });
 });
 

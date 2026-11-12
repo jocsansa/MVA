@@ -25,7 +25,7 @@ test("quantidades conferidas na mesa real", () => {
 
 test("caminhos lidos por tipo de strip", () => {
   assert.deepEqual(stripPaths("ch", 3), [
-    "/ch/3/name", "/ch/3/col", "/ch/3/mute", "/ch/3/fdr", "/ch/3/pan", "/ch/3/$solo", "/ch/3/in/set/$g",
+    "/ch/3/name", "/ch/3/col", "/ch/3/mute", "/ch/3/fdr", "/ch/3/pan", "/ch/3/$solo", "/ch/3/in/set/$g", "/ch/3/in/set/trim",
   ]);
   assert.deepEqual(stripPaths("bus", 16), ["/bus/16/name", "/bus/16/col", "/bus/16/mute", "/bus/16/fdr", "/bus/16/pan", "/bus/16/$solo"]);
   assert.ok(!stripPaths("dca", 1).includes("/dca/1/pan"), "DCA não tem pan");

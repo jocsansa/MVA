@@ -51,6 +51,8 @@ const TRACKED: [RegExp, ChangeCat][] = [
   [/^\/(ch|aux|bus|main|mtx)\/\d+\/pan$/, "pan"],
   // Espelho do ganho no canal e o ganho na fonte (é onde a mesa guarda o valor).
   [/^\/ch\/\d+\/in\/set\/\$g$/, "gain"],
+  // Trim digital do canal: o assistente compensa o ganho da fonte nele.
+  [/^\/ch\/\d+\/in\/set\/trim$/, "gain"],
   [/^\/io\/in\/[A-Z]+\/\d+\/g$/, "gain"],
   [/^\/(ch|aux|bus|main|mtx)\/\d+\/(eq|flt)\/\w+$/, "eq"],
   [/^\/(ch|aux|bus|main|mtx)\/\d+\/(gate|dyn)\/\w+$/, "dyn"],
@@ -320,6 +322,7 @@ export class SessionRecorder {
         if (s.solo !== null) o.solo = s.solo;
         if (s.pan !== null) o.pan = r2(s.pan);
         if (s.gainDb !== null) o.gain = r2(s.gainDb);
+        if (s.trimDb !== null) o.trim = r2(s.trimDb);
         return o;
       });
     }

@@ -17,12 +17,12 @@ export interface StripKindInfo {
   meter: { token: number; words: number } | null;
 }
 
-export type StripParam = "name" | "col" | "mute" | "fdr" | "pan" | "$solo" | "in/set/$g";
+export type StripParam = "name" | "col" | "mute" | "fdr" | "pan" | "$solo" | "in/set/$g" | "in/set/trim";
 
 const FULL: readonly StripParam[] = ["name", "col", "mute", "fdr", "pan", "$solo"];
 
 export const STRIP_KINDS: readonly StripKindInfo[] = [
-  { kind: "ch", label: "Canais", count: 40, params: [...FULL, "in/set/$g"], meter: { token: 0xa0, words: 8 } },
+  { kind: "ch", label: "Canais", count: 40, params: [...FULL, "in/set/$g", "in/set/trim"], meter: { token: 0xa0, words: 8 } },
   { kind: "aux", label: "Aux", count: 8, params: FULL, meter: { token: 0xa1, words: 8 } },
   { kind: "bus", label: "Buses", count: 16, params: FULL, meter: { token: 0xa2, words: 8 } },
   { kind: "main", label: "Mains", count: 4, params: FULL, meter: { token: 0xa3, words: 8 } },
@@ -54,6 +54,8 @@ export interface StripState {
   pan: number | null;
   solo: boolean | null;
   gainDb: number | null;
+  /** Só canais: trim digital do canal (dB), depois do headamp. */
+  trimDb: number | null;
   meter: StripMeter | null;
 }
 
@@ -72,6 +74,7 @@ export function createStrips(): Strips {
       pan: null,
       solo: null,
       gainDb: null,
+      trimDb: null,
       meter: null,
     }));
   }
@@ -82,7 +85,7 @@ export function stripPaths(kind: StripKind, index: number): string[] {
   return STRIP_INFO[kind].params.map((p) => `/${kind}/${index}/${p}`);
 }
 
-const STRIP_PATH = /^\/(ch|aux|bus|main|mtx|dca|mgrp)\/(\d+)\/(name|col|mute|fdr|pan|\$solo|in\/set\/\$g)$/;
+const STRIP_PATH = /^\/(ch|aux|bus|main|mtx|dca|mgrp)\/(\d+)\/(name|col|mute|fdr|pan|\$solo|in\/set\/\$g|in\/set\/trim)$/;
 
 /** Aplica um valor vindo da mesa ao estado. Devolve o strip alterado ou null. */
 export function applyStripValue(strips: Strips, address: string, value: WingValue): StripState | null {
@@ -113,6 +116,9 @@ export function applyStripValue(strips: Strips, address: string, value: WingValu
       break;
     case "in/set/$g":
       if (value.kind === "float") st.gainDb = value.value;
+      break;
+    case "in/set/trim":
+      if (value.kind === "float") st.trimDb = value.value;
       break;
   }
   return st;

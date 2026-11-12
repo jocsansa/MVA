@@ -1,5 +1,6 @@
 // Servidor local: lê a WING e mostra o estado no navegador (http://localhost:PORT).
 // Por padrão é SOMENTE LEITURA. Escritas só com WING_ALLOW_WRITES=1.
+// Por padrão só este computador acessa; com LAN=1 a rede também, com código de acesso (src/access.ts).
 
 import http from "node:http";
 import { readFile } from "node:fs/promises";
@@ -24,6 +25,8 @@ import { buildSendRows, destKey, parseDest, sendPaths, writeSend } from "./sends
 import { MOMENTS, SessionError, SessionRecorder } from "./recorder.ts";
 import { ALERT_LIMITS, AlertEngine, MeterWindow, alertContext, type Alert } from "./alerts.ts";
 import { STATIC_FILES } from "./static-files.ts";
+import { Access, choosePin, isLoopback, loginPage } from "./access.ts";
+import { AssistError, AssistantService } from "./assistant-service.ts";
 
 const host = process.env.CONSOLE_HOST;
 if (!host) {
@@ -35,6 +38,8 @@ const port = Number(process.env.PORT ?? 3000);
 const indexPath = fileURLToPath(new URL("../public/index.html", import.meta.url));
 
 const allowWrites = process.env.WING_ALLOW_WRITES === "1";
+const lan = process.env.LAN === "1";
+const access = new Access({ lan, pin: choosePin(process.env.MVA_PIN), port });
 const wing = new WingClient(host, { allowWrites });
 const clients = new Set<http.ServerResponse>();
 
@@ -74,6 +79,24 @@ wing.on("meters", (strips) => meterWindow.push(Date.now(), strips));
 const alertEntry = (action: string, a: Alert) =>
   ({ type: "alert", action, key: a.key, level: a.level, title: a.title, ...(a.channel ? { channel: a.channel } : {}) });
 const alertState = () => ({ active: alerts.list(), history: alerts.history() });
+
+// Assistente de ganho: modo desligado / sugestivo / automático (src/assistant.ts). Começa no
+// sugestivo (ou ASSIST_MODE=off); o automático só se liga pela página, nunca sozinho ao subir.
+let assistPending = false;
+const assist = new AssistantService(wing, {
+  writesEnabled: allowWrites,
+  mode: process.env.ASSIST_MODE === "off" ? "off" : "suggest",
+  limits: { inputMeterPostTrim: process.env.INPUT_METER_POST_TRIM === "1" },
+  note: (e) => recorder.note(e),
+  changed: () => {
+    if (assistPending) return;
+    assistPending = true;
+    setTimeout(() => {
+      assistPending = false;
+      broadcast("assistant", assist.state());
+    }, 100);
+  },
+});
 function broadcastAlerts(): void {
   broadcast("alerts", alertState());
 }
@@ -88,6 +111,7 @@ setInterval(() => {
   }
   for (const a of cleared) recorder.note(alertEntry("cleared", a));
   if (raised.length || cleared.length) broadcastAlerts();
+  assist.tick(t, wing.strips, ctx.channels.map((c) => c.in), ctx.osc && ctx.meters);
 }, 250);
 
 function broadcast(event: string, data: unknown): void {
@@ -142,11 +166,62 @@ const DYN_READ_ROUTE = /^\/api\/channels\/(\d+)\/dyn$/;
 /** Mesa sem resposta: 502. Pedido inválido ou recusado pela descrição: 400. */
 const writeErrorCode = (msg: string) => (msg.startsWith("Sem resposta") ? 502 : 400);
 
-/** Exige JSON e origem local: impede que outro site no navegador dispare pedidos POST. */
+/**
+ * Exige JSON e a mesma origem da página: impede que outro site no navegador dispare pedidos POST.
+ * O Host já foi conferido em access.check (só nomes deste computador).
+ */
 function isLocalJson(req: http.IncomingMessage): boolean {
   const origin = req.headers.origin;
   return !!req.headers["content-type"]?.startsWith("application/json") &&
-    (!origin || origin === `http://localhost:${port}` || origin === `http://127.0.0.1:${port}`);
+    (!origin || origin === `http://${req.headers.host}`);
+}
+
+const ASSIST_ROUTE = /^\/api\/assistant\/(mode|apply|dismiss|undo)$/;
+
+/** Assistente: modo, OK numa sugestão, ignorar e desfazer. Aplicar e desfazer escrevem na mesa. */
+async function handleAssist(req: http.IncomingMessage, res: http.ServerResponse, action: string): Promise<void> {
+  if (!isLocalJson(req)) return sendJson(res, 403, { error: "Requisição recusada" });
+  const body = (await readJson(req)) as { mode?: unknown; id?: unknown };
+  try {
+    if (action === "mode") return sendJson(res, 200, { mode: assist.setMode(body.mode) });
+    if (action === "dismiss") {
+      assist.dismiss(body.id);
+      return sendJson(res, 200, { ok: true });
+    }
+    const r = action === "apply" ? await assist.apply(body.id) : await assist.undo(body.id);
+    return sendJson(res, r.ok ? 200 : 502, r);
+  } catch (e) {
+    return sendJson(res, e instanceof AssistError ? e.code : 500, { error: (e as Error).message });
+  }
+}
+
+/** Entrada com o código de acesso: formulário (POST /entrar) ou link com ?pin= (GET /). */
+async function handleLogin(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<void> {
+  let pin: unknown = url.searchParams.get("pin");
+  if (req.method === "POST" && url.pathname === "/entrar") {
+    let body = "";
+    for await (const chunk of req) {
+      body += chunk;
+      if (body.length > 256) throw new BodyError("corpo grande demais");
+    }
+    pin = new URLSearchParams(body).get("pin");
+  }
+  if (pin !== null && (url.pathname === "/" || url.pathname === "/entrar")) {
+    const r = access.tryPin(pin, req.socket.remoteAddress ?? "?");
+    if (r === "ok") {
+      access.setCookie(res);
+      res.writeHead(303, { location: "/" }).end();
+      return;
+    }
+    const msg = r === "blocked" ? "Muitas tentativas. Espere um minuto." : "Código errado.";
+    res.writeHead(r === "blocked" ? 429 : 401, { "content-type": "text/html; charset=utf-8" }).end(loginPage(msg));
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(loginPage());
+    return;
+  }
+  sendJson(res, 401, { error: "Digite o código de acesso (abra a página inicial)" });
 }
 
 const SESSION_ROUTE = /^\/api\/sessions\/([\w-]+)$/;
@@ -274,10 +349,23 @@ const server = http.createServer((req, res) => {
 
 async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse) {
   const url = new URL(req.url ?? "/", "http://localhost");
+  const gate = access.check(req);
+  if (gate === "bad-host") {
+    res.writeHead(403, { "content-type": "text/plain; charset=utf-8" }).end("Endereço não permitido");
+    return;
+  }
+  if (gate === "login") return handleLogin(req, res, url);
+  if (req.method === "GET" && url.pathname === "/" && url.searchParams.has("pin")) {
+    // Já entrou (ou é este computador): tira o código da barra de endereço.
+    res.writeHead(303, { location: "/" }).end();
+    return;
+  }
   if (req.method === "POST") {
     // Erros que os handlers não tratam caem no catch do createServer.
     const ses = SESSION_ROUTE.exec(url.pathname);
+    const asr = ASSIST_ROUTE.exec(url.pathname);
     if (ses) await handleSession(req, res, ses[1]!);
+    else if (asr) await handleAssist(req, res, asr[1]!);
     else if (url.pathname === "/api/alerts/dismiss") await handleDismiss(req, res);
     else await handleWrite(req, res, url);
     return;
@@ -359,6 +447,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     }
   } else if (url.pathname === "/api/alerts") {
     sendJson(res, 200, { ...alertState(), limits: ALERT_LIMITS });
+  } else if (url.pathname === "/api/assistant") {
+    sendJson(res, 200, assist.state());
+  } else if (url.pathname === "/api/access") {
+    // O código e os links só aparecem no próprio computador do servidor.
+    sendJson(res, 200, isLoopback(req.socket.remoteAddress) ? { lan, urls: access.urls(), pin: lan ? access.pin : null } : { lan });
   } else if (url.pathname === "/api/sessions") {
     sendJson(res, 200, { active: recorder.current, moments: MOMENTS, dir: sessionsDir, sessions: recorder.list() });
   } else if (SESSION_ROUTE.test(url.pathname)) {
@@ -382,6 +475,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     res.write(`event: state\ndata: ${JSON.stringify(snapshot())}\n\n`);
     res.write(`event: session\ndata: ${JSON.stringify(recorder.current)}\n\n`);
     res.write(`event: alerts\ndata: ${JSON.stringify(alertState())}\n\n`);
+    res.write(`event: assistant\ndata: ${JSON.stringify(assist.state())}\n\n`);
     clients.add(res);
     req.on("close", () => clients.delete(res));
   } else {
@@ -389,10 +483,14 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   }
 }
 
-// Só escuta em localhost: a interface não fica exposta na rede.
-server.listen(port, "127.0.0.1", () => {
+// Sem LAN=1 só escuta em localhost: a interface não fica exposta na rede.
+server.listen(port, lan ? "0.0.0.0" : "127.0.0.1", () => {
   const mode = allowWrites ? "ESCRITA LIBERADA" : "somente leitura";
-  console.log(`WING ${host} — interface em http://localhost:${port} (${mode})`);
+  console.log(`WING ${host} — interface em http://localhost:${port} (${mode}); assistente: ${assist.engine.mode}`);
+  if (lan) {
+    console.log(`Acesso pela rede LIGADO. Código de acesso: ${access.pin}`);
+    for (const u of access.urls()) console.log(`  No celular/tablet: ${u}`);
+  }
 });
 
 setInterval(() => {

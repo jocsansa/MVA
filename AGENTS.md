@@ -12,6 +12,11 @@ Detalhes: [arquitetura](docs/architecture.md), [design](docs/design.md), [qualid
 - Desenvolver e testar na **mesa simulada** (`CONSOLE_HOST=127.0.0.1`). O servidor só escreve com
   `WING_ALLOW_WRITES=1`; sem isso é somente leitura.
 - Gravação de sessões e alertas são **só leitura**: nunca enviam comando para a mesa.
+- O **assistente** escreve na mesa com o OK do operador (sugestivo) ou sozinho no **automático**, por
+  decisão do usuário (12/11/2026), sempre pelo `WingClient` (validação, leitura de volta,
+  `WING_ALLOW_WRITES=1`). Não afrouxar `ASSIST_LIMITS`, a ordem segura nem a compensação no trim sem
+  pedido explícito; o automático nunca liga sozinho ao subir o servidor.
+- Acesso pela rede só com `LAN=1` e código de acesso; não remover a checagem de Host nem de origem.
 - Trabalhar só dentro desta pasta. Não modificar outros projetos (automix, openreply, qteste x32);
   o automix pode ser **lido** para reaproveitar desenho.
 - Não fazer commit nem push sem pedido explícito.
@@ -23,13 +28,15 @@ No Windows use `npm.cmd` (o PowerShell bloqueia `npm.ps1`). Node ≥ 22.18, Type
 
 - Instalar: `npm install`
 - Mesa simulada: `npm run simulate` (terminal 1)
-- Servidor: `CONSOLE_HOST=127.0.0.1 npm start` (terminal 2; porta 3000, `PORT` muda)
+- Servidor: `CONSOLE_HOST=127.0.0.1 npm start` (terminal 2; porta 3000, `PORT` muda; `LAN=1` abre
+  para celulares com código de acesso)
 - Tipos: `npm run typecheck` · Lint: `npm run lint` · Regras de lint: `npm run verify:rules`
 - Testes: `npm test` (node:test, `test/**/*.test.ts`)
 - Tudo junto: `npm run check` (tipos + lint + regras + testes)
 - Página no navegador: `npm run smoke` (Chrome headless, servidor rodando; só olha, não clica em
   controles da mesa)
 - Achar a mesa real: `npm run discover`
+- Medidor de entrada de um canal (calibração): `npm run medidor -- <canal>`
 
 ## Combinados de trabalho
 

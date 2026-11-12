@@ -45,6 +45,9 @@ const DEFS: Record<string, Def> = {
   pre: { type: "int", min: 0, max: 1 },
   g: { type: "lin", min: -2, max: 45.5, unit: "dB", steps: 20 },
   $g: { type: "lin", min: -2, max: 45.5, unit: "dB", steps: 20 },
+  // Trim digital do canal (fixture ch_1_in_set da WING real).
+  trim: { type: "lin", min: -18, max: 18, unit: "dB", steps: 361, digits: 1 },
+  "set/$mode": { type: "list", options: ["M", "ST", "M/S"] },
   altsrc: { type: "int", min: 0, max: 1 },
   grp: { type: "list", options: ["OFF", "LCL", "AUX", "A", "B", "C", "SC", "USB", "CRD", "MOD", "PLAY", "AES", "USR", "OSC"] },
   in: { type: "int", min: 1, max: 64 },
@@ -127,8 +130,12 @@ for (let ch = 1; ch <= 40; ch++) {
   set(`/ch/${ch}/in/conn/in`, ch);
   set(`/ch/${ch}/in/conn/altgrp`, "OFF");
   set(`/ch/${ch}/in/conn/altin`, 1);
-  if (local) set(`/io/in/LCL/${ch}/g`, 20.5);
-  set(`/ch/${ch}/in/set/$g`, local ? 20.5 : 0);
+  // Demonstração do assistente de ganho: CH 3 clipa, CH 4 fica quente e CH 6 entra fraco.
+  const g = ch === 3 ? 40.5 : ch === 4 ? 35.5 : ch === 6 ? 3 : 20.5;
+  if (local) set(`/io/in/LCL/${ch}/g`, g);
+  set(`/ch/${ch}/in/set/$g`, local ? g : 0);
+  set(`/ch/${ch}/in/set/trim`, 0);
+  set(`/ch/${ch}/in/set/$mode`, "M");
 }
 // EQ e filtro: canais de voz com cortes leves; o canal 40 usa outro modelo de EQ (não editável no painel).
 for (let ch = 1; ch <= 40; ch++) {
@@ -329,7 +336,7 @@ osc.on("message", (buf, r) => {
     console.log(`[escrita simulada] ${m.address} = ${JSON.stringify(a.value)}`);
     const g = /^\/io\/in\/LCL\/(\d+)\/g$/.exec(m.address);
     if (g) {
-      values.set(`/ch/${g[1]}/in/set/$g`, a.value as number);
+      values.set(`/ch/${g[1]}/in/set/$g`, values.get(m.address)!);
       notify(`/ch/${g[1]}/in/set/$g`);
     }
     notify(m.address);
@@ -439,6 +446,8 @@ setInterval(() => {
       if (l.kind === "ch" && l.words >= 8) {
         // Entrada (palavras 0 e 1): o sinal da fonte, antes do fader e do mute. Canais 1..20 têm
         // fonte; o ganho acima de 20,5 dB sobe a entrada (com ganho alto o canal clipa em 0 dBFS).
+        // Aqui o medidor de entrada fica ANTES do trim (no conversor); na WING real isso ainda
+        // precisa ser conferido (ASSIST_LIMITS.inputMeterPostTrim).
         const g = values.get(`/ch/${l.index}/in/set/$g`);
         const input = l.index > 20 ? -128
           : Math.min(0, -30 + 12 * Math.sin(t * 2 + l.index) + (typeof g === "number" ? g - 20.5 : 0));

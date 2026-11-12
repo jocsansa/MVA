@@ -19,7 +19,9 @@ Não há build nem CI. No Windows use `npm.cmd`.
   `test()` do `node:test` é isento porque o runner aguarda a promessa.
 - `quality/max-lines` (350 linhas, do toolkit) em **warn**. Contagem na adoção (29/10/2026):
   5 arquivos — `public/app.js` 2307, `src/wing.ts` 581, `src/recorder.ts` 480,
-  `src/simulator.ts` 465, `src/server.ts` 415 (contagem do lint). Plano: dividir por responsabilidade quando o arquivo
+  `src/simulator.ts` 465, `src/server.ts` 415 (contagem do lint). Em 12/11/2026, com o assistente:
+  `app.js` 2450, `server.ts` 513, `recorder.ts` 483, `simulator.ts` 472 (os módulos novos ficaram abaixo
+  do limite). Plano: dividir por responsabilidade quando o arquivo
   for mexido por outro motivo (o `app.js` primeiro, por aba). Quando zerar, passa para error.
 - `typescript-eslint` recommended + `@eslint/js` recommended. Não baixar severidade nem usar ignores
   amplos para esconder aviso; `eslint-rules/` é cópia do toolkit e não se edita aqui.
@@ -29,6 +31,10 @@ Não há build nem CI. No Windows use `npm.cmd`.
 - Lógica pura (OSC, descrição de nós, medidores, alertas, gravador, `mixer-lib`) com testes diretos.
 - Cliente da WING contra a mesa falsa: toda leitura e todo `dryRun` conferem `fake.writes.length === 0`;
   escritas conferem a mensagem exata e a leitura de volta.
+- Assistente: regras e motor com testes diretos (`test/assistant.test.ts`); executor contra a mesa
+  falsa com os comandos exatos, a ordem segura, o rollback e o desfazer (`test/corrections.test.ts`);
+  acesso pela rede em `test/access.test.ts`. Mudança nas regras ou nos limites do automático é de
+  risco: revisão independente e ensaio no simulador antes de usar na mesa real.
 - Página: `test/ui.test.ts` lê `index.html`, `app.css` e `app.js` (estrutura, ids, rotas usadas) e
   roda o `mixer-lib`; o comportamento real fica no `npm run smoke` e em testes manuais no simulador.
 - Correção de bug: reproduzir primeiro e deixar teste de regressão quando der.
@@ -37,7 +43,8 @@ Não há build nem CI. No Windows use `npm.cmd`.
 
 Só com o usuário presente e autorizando cada comando. Um comando por vez, num canal sem entrada,
 mostrando o comando exato antes e revertendo depois. O que foi confirmado vai para "Testado na mesa
-real" no README. Pendências: escrita de ganho, palavras 0/1 do medidor, limites dos alertas.
+real" no README. Pendências: escrita de ganho e trim, palavras 0/1 do medidor (e se vêm antes ou
+depois do trim), limites dos alertas e do assistente. Roteiro: [teste-no-culto.md](teste-no-culto.md).
 
 ## Revisão depois de implementar ou corrigir
 

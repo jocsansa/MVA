@@ -21,6 +21,11 @@
 | `src/eq.ts`, `src/dyn.ts`, `src/sends.ts` | EQ/filtro, gate/compressor e envios em cima da base genérica |
 | `src/recorder.ts` | Gravação das sessões em JSONL (`data/sessions`), rotação e leitura |
 | `src/alerts.ts` | Regras dos alertas ao vivo (`ALERT_LIMITS`), motor e janela de picos; funções puras |
+| `src/assistant-rules.ts` | Assistente de ganho: limites (`ASSIST_LIMITS`), tipos e regras (clip, quente, fraco, mutado com sinal); funções puras |
+| `src/assistant.ts` | Motor do assistente: modos off/suggest/auto, ciclo de vida das sugestões, cooldown, tetos do automático, histórico. Não fala com a mesa |
+| `src/corrections.ts` | Executor das correções: plano só de leitura (fonte, ganho, trims, descrições), escrita na ordem segura com leitura de volta, rollback e desfazer |
+| `src/assistant-service.ts` | Liga motor, executor, gravação e página; fila única de correções na mesa |
+| `src/access.ts` | Acesso pela rede (`LAN=1`): Host permitido, código de acesso, cookie, página de entrada |
 | `src/simulator.ts` | Mesa WING simulada (OSC, descrição de nós, medidores) |
 | `src/discover.ts` | Descoberta da WING na rede (UDP 2222) |
 | `public/index.html` | Marcação da página e o bloco `mixer-lib` (funções puras, testadas em `test/ui.test.ts`) |
@@ -29,6 +34,7 @@
 | `public/eq-curve.js` | Curva de resposta do EQ (módulo ES, também importado pelos testes) |
 | `test/fake-wing.ts` | Mesa falsa dos testes: registra escritas e responde GETs |
 | `scripts/ui-smoke.mjs` | Smoke da página num Chrome headless |
+| `scripts/medidor-entrada.mjs` | `npm run medidor -- <canal>`: entrada, ganho e trim de um canal (calibração; só leitura) |
 | `eslint-rules/`, `scripts/verify-quality-rules.mjs` | Regras de lint do toolkit (cópia) e autoteste |
 
 ## Fronteiras e fluxo
@@ -36,15 +42,23 @@
 ```
 WING ──OSC UDP 2223──▶ wing.ts ──estado/eventos──▶ server.ts ──SSE──▶ página (app.js)
      ◀─nativo TCP 2222─┘   ▲  medidores via UDP         │  ├─▶ recorder.ts ─▶ data/sessions/*.jsonl
-                           │                             │  └─▶ alerts.ts (a cada 250 ms)
-                           └──── escrita (só allowWrites) ◀── POST /api/* ◀── página / curl
+                           │                             │  ├─▶ alerts.ts (a cada 250 ms)
+                           │                             │  └─▶ assistant.ts (a cada 250 ms) ─▶ sugestões
+                           │                             │        └─ OK / automático ─▶ fila ─▶ corrections.ts ─┐
+                           ├──── escrita (só allowWrites) ◀── POST /api/* ◀── página / curl                  │
+                           └──── escrita (só allowWrites) ◀──────────────────────────────────────────────────┘
 ```
 
 - **Escrita**: só passa por `WingClient` com `WING_ALLOW_WRITES=1`. Antes de escrever, o valor é
   conferido contra a descrição atual do nó; depois, lido de volta. `dryRun` devolve o comando exato.
 - **POST** exige `content-type: application/json` e origem local (`isLocalJson`).
 - **Gravação e alertas** recebem eventos e medidores; não têm acesso ao caminho de escrita.
-- O servidor escuta só em `127.0.0.1`. Erro inesperado num pedido vira 500 sem derrubar o processo.
+- **Assistente**: o motor (`assistant.ts`) só decide; quem escreve é `corrections.ts`, pelo mesmo
+  `WingClient` (validação, leitura de volta, `allowWrites`), uma correção por vez na fila do
+  `assistant-service.ts`. O plano mostrado na sugestão é só leitura.
+- O servidor escuta só em `127.0.0.1`; com `LAN=1`, na rede, e quem não é o próprio computador
+  precisa do código de acesso (`access.ts`). O Host é conferido sempre. Erro inesperado num pedido
+  vira 500 sem derrubar o processo.
 
 ## Dados
 
@@ -57,6 +71,9 @@ WING ──OSC UDP 2223──▶ wing.ts ──estado/eventos──▶ server.ts
 - A página continua sem bundler: `mixer-lib` fica embutido no HTML porque os testes o avaliam direto
   do arquivo; o resto do script fica em `public/app.js`.
 - Medidores pelo protocolo nativo porque o OSC da WING não entrega medidores.
+- Correções de ganho neutras no volume (ganho da fonte + trim de todos os canais da fonte): mudam a
+  margem até o clip sem mudar o que o público e os músicos ouvem; por isso podem ir no automático.
+- Assistente só com regras locais (sem LLM nem internet) no primeiro teste, por decisão do usuário.
 
 ## Manutenção
 

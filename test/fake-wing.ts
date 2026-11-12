@@ -15,6 +15,8 @@ const INT_PARAM = /\/(mute|altsrc|in|altin)$/;
 export async function fakeWing(
   initial: Record<string, string | number> = {},
   descriptions: Record<string, string> = {},
+  /** Efeito extra de uma escrita (ex.: espelhar o ganho da fonte no $g do canal, como a WING). */
+  onWrite?: (msg: OscMessage, values: Map<string, string | number>) => void,
 ) {
   const values = new Map<string, string | number>(Object.entries(initial));
   const writes: OscMessage[] = [];
@@ -39,6 +41,7 @@ export async function fakeWing(
     if (a) {
       writes.push(msg);
       if (a.type !== "b") values.set(msg.address, a.value);
+      onWrite?.(msg, values);
       return;
     }
     let v = values.get(msg.address);
